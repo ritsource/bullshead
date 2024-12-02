@@ -1,0 +1,30 @@
+[
+  {
+    "name": "trade_id",
+    "type": "number"
+  },
+  {
+    "name": "price", 
+    "type": "number"
+  },
+  {
+    "name": "qty",
+    "type": "number"
+  },
+  {
+    "name": "quote_qty",
+    "type": "number"
+  },
+  {
+    "name": "time",
+    "type": "number"
+  },
+  {
+    "name": "is_buyer_maker",
+    "type": "boolean"
+  },
+  {
+    "name": "is_best_match",
+    "type": "boolean"
+  }
+]

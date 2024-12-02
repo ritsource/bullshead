@@ -1,0 +1,50 @@
+[
+  {
+    "name": "open_time",
+    "type": "number"
+  },
+  {
+    "name": "open",
+    "type": "number"
+  },
+  {
+    "name": "high",
+    "type": "number"
+  },
+  {
+    "name": "low",
+    "type": "number"
+  },
+  {
+    "name": "close",
+    "type": "number"
+  },
+  {
+    "name": "volume",
+    "type": "number"
+  },
+  {
+    "name": "close_time",
+    "type": "number"
+  },
+  {
+    "name": "quote_asset_volume",
+    "type": "number"
+  },
+  {
+    "name": "number_of_trades",
+    "type": "number"
+  },
+  {
+    "name": "taker_buy_base_asset_volume",
+    "type": "number"
+  },
+  {
+    "name": "taker_buy_quote_asset_volume",
+    "type": "number"
+  },
+  {
+    "name": "ignore",
+    "type": "number"
+  }
+]

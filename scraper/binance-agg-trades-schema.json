@@ -1,0 +1,34 @@
+[
+  {
+    "name": "aggregate tradeId",
+    "type": "number"
+  },
+  {
+    "name": "price",
+    "type": "number"
+  },
+  {
+    "name": "quantity",
+    "type": "number"
+  },
+  {
+    "name": "first_trade_id",
+    "type": "number"
+  },
+  {
+    "name": "last_trade_id",
+    "type": "number"
+  },
+  {
+    "name": "timestamp",
+    "type": "number"
+  },
+  {
+    "name": "was_the_buyer_the_maker",
+    "type": "boolean"
+  },
+  {
+    "name": "was_the_trade_the_best_price_match",
+    "type": "boolean"
+  }
+]
