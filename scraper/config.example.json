@@ -1,0 +1,150 @@
+{
+  "start_date": "2024-11-01",
+  "end_date": "2024-11-30",
+  "sources": [
+    {
+      "name": "aggTrades",
+      "file_name_prefix": "BTCUSDC-aggTrades-",
+      "base_url": "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDC/"
+    },
+    {
+      "name": "klines",
+      "file_name_prefix": "BTCUSDC-",
+      "base_url": "https://data.binance.vision/data/spot/daily/klines/BTCUSDC/"
+    },
+    {
+      "name": "trades",
+      "file_name_prefix": "BTCUSDC-trades-",
+      "base_url": "https://data.binance.vision/data/spot/daily/trades/BTCUSDC/"
+    }
+  ],
+  "agg-trades-schema": [
+    {
+      "name": "aggregate tradeId",
+      "type": "number"
+    },
+    {
+      "name": "price",
+      "type": "number"
+    },
+    {
+      "name": "quantity",
+      "type": "number"
+    },
+    {
+      "name": "first_trade_id",
+      "type": "number"
+    },
+    {
+      "name": "last_trade_id",
+      "type": "number"
+    },
+    {
+      "name": "timestamp",
+      "type": "number"
+    },
+    {
+      "name": "was_the_buyer_the_maker",
+      "type": "boolean"
+    },
+    {
+      "name": "was_the_trade_the_best_price_match",
+      "type": "boolean"
+    }
+  ],
+  "intervals": [
+    "12h",
+    "15m",
+    "1d",
+    "1h",
+    "1m",
+    "1s",
+    "2h",
+    "30m",
+    "3m",
+    "4h",
+    "5m",
+    "6h",
+    "8h"
+  ],
+  "klines-schema": [
+    {
+      "name": "open_time",
+      "type": "number"
+    },
+    {
+      "name": "open",
+      "type": "number"
+    },
+    {
+      "name": "high",
+      "type": "number"
+    },
+    {
+      "name": "low",
+      "type": "number"
+    },
+    {
+      "name": "close",
+      "type": "number"
+    },
+    {
+      "name": "volume",
+      "type": "number"
+    },
+    {
+      "name": "close_time",
+      "type": "number"
+    },
+    {
+      "name": "quote_asset_volume",
+      "type": "number"
+    },
+    {
+      "name": "number_of_trades",
+      "type": "number"
+    },
+    {
+      "name": "taker_buy_base_asset_volume",
+      "type": "number"
+    },
+    {
+      "name": "taker_buy_quote_asset_volume",
+      "type": "number"
+    },
+    {
+      "name": "ignore",
+      "type": "number"
+    }
+  ],
+  "trades-schema": [
+    {
+      "name": "trade_id",
+      "type": "number"
+    },
+    {
+      "name": "price",
+      "type": "number"
+    },
+    {
+      "name": "qty",
+      "type": "number"
+    },
+    {
+      "name": "quote_qty",
+      "type": "number"
+    },
+    {
+      "name": "time",
+      "type": "number"
+    },
+    {
+      "name": "is_buyer_maker",
+      "type": "boolean"
+    },
+    {
+      "name": "is_best_match",
+      "type": "boolean"
+    }
+  ]
+}

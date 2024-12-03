@@ -7,12 +7,12 @@ download_dir = "binance_data"
 output_dir = "binance_data_merged"
 
 # Load schemas
-agg_trades_schema = json.load(open("binance-agg-trades-schema.json"))
-trades_schema = json.load(open("binance-trades-schema.json")) 
-klines_schema = json.load(open("binance-klines-schema.json"))
-
-sources = json.load(open("sources.json"))
-intervals = json.load(open("binance-intervals.json"))
+config = json.load(open("config.json"))
+sources = config["sources"]
+intervals = config["intervals"]
+agg_trades_schema = config["agg-trades-schema"]
+trades_schema = config["trades-schema"]
+klines_schema = config["klines-schema"]
 
 # Create the directories if they don't exist
 os.makedirs(download_dir, exist_ok=True)

@@ -9,8 +9,9 @@ base_url = "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDC/"
 download_dir = "binance_data/downloads"
 output_dir = "binance_data"
 
-sources = json.load(open("sources.json"))
-intervals = json.load(open("binance-intervals.json"))
+config = json.load(open("config.json"))
+sources = config["sources"]
+intervals = config["intervals"]
 
 # Create the directories if they don't exist
 os.makedirs(download_dir, exist_ok=True)

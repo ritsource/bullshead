@@ -9,15 +9,17 @@ base_url = "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDC/"
 # Directory to save downloaded files
 download_dir = "binance_data"
 
-sources = json.load(open("sources.json"))
-intervals = json.load(open("binance-intervals.json"))
+config = json.load(open("config.json"))
+sources = config["sources"]
+intervals = config["intervals"]
+
+start_date = datetime.strptime(config["start_date"], "%Y-%m-%d")
+end_date = datetime.strptime(config["end_date"], "%Y-%m-%d")
 
 # Create the directory if it doesn't exist
 os.makedirs(download_dir, exist_ok=True)
 
 def download_files(name, base_url, file_name_prefix, download_dir):
-    start_date = datetime(2024, 11, 15)
-    end_date = datetime(2024, 11, 20)
     current_date = start_date
 
     file_urls = []
