@@ -1,2 +1,20 @@
-*/binance_data_merged
-*/binance_data
+# Environment
+venv/
+.env
+.env.*
+__pycache__/
+*.pyc
+
+# Model files
+src/app/models/*.joblib
+
+# OS files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+/dev/
+
+/models

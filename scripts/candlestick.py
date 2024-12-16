@@ -4,6 +4,7 @@ from matplotlib.widgets import Slider, Button
 from mplfinance.original_flavor import candlestick_ohlc
 import matplotlib.dates as mdates
 import os
+from sklearn.preprocessing import MinMaxScaler
 
 print(os.getcwd())
 
@@ -21,6 +22,15 @@ df['date_num'] = mdates.date2num(df['open_time'])  # Convert to matplotlib date 
 
 # Select required columns for candlestick chart
 data = df[['date_num', 'open', 'high', 'low', 'close', 'volume']].copy()
+
+# Normalize the data
+scaler = MinMaxScaler()
+price_data = df[['close']].values
+normalized_data = scaler.fit_transform(price_data)
+
+# Print shape of data for debugging
+print(f"Shape of data: {data.shape}")
+print(f"Shape of normalized data: {normalized_data.shape}")
 
 # Plotting
 fig, ax = plt.subplots(figsize=(15, 8))
@@ -56,6 +66,9 @@ def update(val=None):
     start_index = scroll_pos
     end_index = min(start_index + zoom_level, len(data))
     visible_data = data.iloc[start_index:end_index]
+    
+    # Print shape of visible data for debugging
+    print(f"Shape of visible_data: {visible_data.shape}")
     
     # Update scroll slider range based on zoom level
     scroll_slider.valmax = len(data) - zoom_level
