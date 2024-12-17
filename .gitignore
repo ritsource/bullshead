@@ -16,5 +16,5 @@ src/app/models/*.joblib
 .idea/
 
 /dev/
-
 /models
+/src/models/weights

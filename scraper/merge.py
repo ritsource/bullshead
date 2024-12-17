@@ -19,7 +19,7 @@ os.makedirs(download_dir, exist_ok=True)
 os.makedirs(output_dir, exist_ok=True)
 
 def merge_files(download_dir, source_name):
-    print(f"\nMerging {source_name} files...")
+    print("\nMerging " + source_name + " files...")
     
     source_dir = os.path.join(download_dir, source_name)
     os.makedirs(source_dir, exist_ok=True)
@@ -35,7 +35,7 @@ def merge_files(download_dir, source_name):
         schema = [col["name"] for col in klines_schema]
         merge_klines_files(source_dir, schema)
     else:
-        print(f"Unknown source type: {source_name}")
+        print("Unknown source type: " + source_name)
         return
 
 def merge_regular_files(source_dir, source_name, schema):
@@ -50,12 +50,12 @@ def merge_regular_files(source_dir, source_name, schema):
                 df = pd.read_csv(file_path, header=None)
                 # Verify column count matches schema
                 if len(df.columns) != len(schema):
-                    print(f"Warning: {file} has {len(df.columns)} columns but schema has {len(schema)} columns. Skipping file.")
+                    print("Warning: " + file + " has " + str(len(df.columns)) + " columns but schema has " + str(len(schema)) + " columns. Skipping file.")
                     continue
                 all_data.append(df)
-                print(f"Processed {file}")
+                print("Processed " + file)
             except Exception as e:
-                print(f"Error processing {file}: {str(e)}")
+                print("Error processing " + file + ": " + str(e))
                 
     if all_data:
         # Concatenate all dataframes
