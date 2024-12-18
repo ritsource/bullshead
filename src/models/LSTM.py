@@ -1,84 +1,62 @@
 import numpy as np
-import os
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Input
+from tensorflow.keras.layers import LSTM, Dense, Input, Dropout
 
 class LSTMModel:
-    def __init__(self, input_shape, weights_path=None, **kwargs):
+    def __init__(self, input_shape):
         """
-        Initialize LSTM model for predicting binary outcomes from market data.
+        Initialize LSTM model for stock price prediction.
         Args:
             input_shape: Shape of input data (timesteps, features)
-            weights_path: Optional path to load pre-trained weights
         """
         self.model = Sequential([
             Input(shape=input_shape),
-            LSTM(128, return_sequences=True),
-            LSTM(64),
-            Dense(32, activation='relu'),
-            Dense(1, activation='sigmoid')  # Binary classification output
+            LSTM(50, return_sequences=True, activation='tanh'),
+            Dropout(0.2),
+            LSTM(50, return_sequences=True, activation='tanh'),
+            Dropout(0.2), 
+            LSTM(50, activation='tanh'),
+            Dropout(0.2),
+            Dense(1)  # Single continuous output for price prediction
         ])
         self.model.compile(
             optimizer="adam",
-            loss="binary_crossentropy",
-            metrics=["accuracy"]
+            loss="mean_squared_error"  # MSE loss for regression
         )
-        
-        if weights_path:
-            self.load_weights(weights_path)
-    
-    def save_weights(self, filepath):
-        """Save model weights to file"""
-        self.model.save_weights(filepath)
-        print("Model weights saved to {}".format(filepath))
-    
-    def load_weights(self, filepath):
-        """Load model weights from file"""
-        try:
-            if not os.path.exists(filepath):
-                print("Warning: Weights file not found at {}".format(filepath))
-                return
-            self.model.load_weights(filepath)
-            print("Model weights loaded from {}".format(filepath))
-        except Exception as e:
-            print("Error loading weights: {}".format(str(e)))
-            raise
 
-    def train(self, X, y, epochs=50, batch_size=32, validation_split=0.2, save_path=None):
+    def train(self, X_train, y_train, X_validate=None, y_validate=None, epochs=200, batch_size=32, callbacks=None):
         """
-        Train model on market data.
+        Train model on stock price data.
         Args:
-            X: Market data features shaped (samples, timesteps, features)
-            y: Binary labels (0/1) for price movement direction
+            X_train: Training features shaped (samples, timesteps, features)
+            y_train: Training target values
+            X_validate: Optional validation features
+            y_validate: Optional validation targets  
             epochs: Number of training epochs
             batch_size: Training batch size
-            validation_split: Fraction of data for validation
-            save_path: Optional path to save weights after training
+            callbacks: Optional list of Keras callbacks
         """
-        history = self.model.fit(
-            X, y,
+        validation_data = (X_validate, y_validate) if X_validate is not None else None
+        
+        return self.model.fit(
+            x=X_train,
+            y=y_train, 
+            validation_data=validation_data,
             epochs=epochs,
             batch_size=batch_size,
-            validation_split=validation_split,
+            callbacks=callbacks,
             verbose=1
         )
-        
-        if save_path:
-            import os
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            self.save_weights(save_path)
-            
-        return history
 
     def predict(self, X):
         """
-        Make predictions on market data.
+        Make predictions on stock price data.
         Args:
-            X: Market data features shaped (samples, timesteps, features)
+            X: Input features shaped (samples, timesteps, features)
         Returns:
-            Dict with predictions and confidence scores
+            Array of predicted prices
         """
-        predictions = self.model.predict(X)
-        return {
-            'predictions': predictions.flatten()
-        }
+        if self.model is None:
+            raise ValueError("Model has not been trained yet")
+            
+        return self.model.predict(X)

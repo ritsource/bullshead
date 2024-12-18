@@ -50,12 +50,13 @@ def merge_regular_files(source_dir, source_name, schema):
                 df = pd.read_csv(file_path, header=None)
                 # Verify column count matches schema
                 if len(df.columns) != len(schema):
-                    print("Warning: " + file + " has " + str(len(df.columns)) + " columns but schema has " + str(len(schema)) + " columns. Skipping file.")
+                    print("Warning: {} has {} columns but schema has {} columns. Skipping file.".format(
+                        file, len(df.columns), len(schema)))
                     continue
                 all_data.append(df)
-                print("Processed " + file)
+                print("Processed {}".format(file))
             except Exception as e:
-                print("Error processing " + file + ": " + str(e))
+                print("Error processing {}: {}".format(file, str(e)))
                 
     if all_data:
         # Concatenate all dataframes
@@ -71,9 +72,9 @@ def merge_regular_files(source_dir, source_name, schema):
         # Save merged file
         output_file = os.path.join(source_output_dir, "merged.csv")
         merged_df.to_csv(output_file, index=False)
-        print(f"Saved merged file to {output_file}")
+        print("Saved merged file to {}".format(output_file))
     else:
-        print(f"No data found for {source_name}")
+        print("No data found for {}".format(source_name))
 
 def merge_klines_files(source_dir, schema):
     # Group files by interval
@@ -94,12 +95,13 @@ def merge_klines_files(source_dir, schema):
             try:
                 df = pd.read_csv(file_path, header=None)
                 if len(df.columns) != len(schema):
-                    print(f"Warning: {file} has {len(df.columns)} columns but schema has {len(schema)} columns. Skipping file.")
+                    print("Warning: {} has {} columns but schema has {} columns. Skipping file.".format(
+                        file, len(df.columns), len(schema)))
                     continue
                 all_data.append(df)
-                print(f"Processed {file}")
+                print("Processed {}".format(file))
             except Exception as e:
-                print(f"Error processing {file}: {str(e)}")
+                print("Error processing {}: {}".format(file, str(e)))
 
         if all_data:
             merged_df = pd.concat(all_data, ignore_index=True)
@@ -112,10 +114,10 @@ def merge_klines_files(source_dir, schema):
             # Save merged file for this interval
             output_file = os.path.join(interval_dir, "merged.csv")
             merged_df.to_csv(output_file, index=False)
-            print(f"Saved merged file to {output_file}")
+            print("Saved merged file to {}".format(output_file))
         else:
-            print(f"No data found for interval {interval}")
+            print("No data found for interval {}".format(interval))
 
 for src in sources:
-    print(f"\nProcessing {src['name']}")
+    print("\nProcessing {}".format(src["name"]))
     merge_files(download_dir, src["name"])
