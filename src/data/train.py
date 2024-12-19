@@ -21,9 +21,7 @@ def construct_lstm_data(data, sequence_size, target_attr_idx):
     # Return constructed variables
     return np.array(data_X), np.array(data_y)
 
-def train(data_dir="data/processed/", models_dir="models/lstm/", data_source_name="btc_usdt_30m"):
-  # pass
-  
+def train(data_dir="data/processed/", models_dir="models/lstm/", data_source_name="btc_usdt_30m", model_name="btc_usdt_30m_lstm"):
   # Prepare data file location and name
   data_file_location = data_dir
   data_file_name_train = data_source_name + "_train_scaled.csv"
@@ -86,16 +84,88 @@ def train(data_dir="data/processed/", models_dir="models/lstm/", data_source_nam
   # Construct testing dataset
   X_test, y_test = construct_lstm_data(data_all_scaled[-(test_size+sequence_size):,:], sequence_size, 0)
   
-  # Check original data and data splits shapes
-  print(f"Full Scaled Data: {data_all_scaled.shape}")
-  print(f"\n Data Train Scaled: {data_train_scaled.shape}")
-  print(f"> Data Train X: {X_train.shape}")
-  print(f"> Data Train y: {y_train.shape}")
+  # # Check original data and data splits shapes
+  # print(f"Full Scaled Data: {data_all_scaled.shape}")
+  # print(f"\n Data Train Scaled: {data_train_scaled.shape}")
+  # print(f"> Data Train X: {X_train.shape}")
+  # print(f"> Data Train y: {y_train.shape}")
 
-  print(f"\n Data Validate Scaled: {data_validate_scaled.shape}")
-  print(f"> Data Validate X: {X_validate.shape}")
-  print(f"> Data Validate y: {y_validate.shape}")
+  # print(f"\n Data Validate Scaled: {data_validate_scaled.shape}")
+  # print(f"> Data Validate X: {X_validate.shape}")
+  # print(f"> Data Validate y: {y_validate.shape}")
 
-  print(f"\n Data Test Scaled: {data_test_scaled.shape}")
-  print(f"> Data Test X: {X_test.shape}")
-  print(f"> Data Test y: {y_test.shape}")
+  # print(f"\n Data Test Scaled: {data_test_scaled.shape}")
+  # print(f"> Data Test X: {X_test.shape}")
+  # print(f"> Data Test y: {y_test.shape}")
+  
+  # Initializing the model
+  regressor = Sequential()
+  
+  # Add input layer
+  regressor.add(Input(shape=(X_train.shape[1], X_train.shape[2])))
+  
+  # Add first LSTM layer and dropout regularization layer
+  regressor.add(LSTM(units = 100, return_sequences = True))
+  regressor.add(Dropout(rate = 0.2))
+  
+  # Add second LSTM layer and dropout regularization layer
+  regressor.add(LSTM(units = 100, return_sequences = True))
+  regressor.add(Dropout(rate = 0.2))
+  
+  # Add third LSTM layer and dropout regularization layer
+  regressor.add(LSTM(units = 100, return_sequences = True))
+  regressor.add(Dropout(rate = 0.2))
+  
+  # Add forth LSTM layer and dropout regularization layer
+  regressor.add(LSTM(units = 100))
+  regressor.add(Dropout(rate = 0.2))
+  
+  # Add last dense layer/output layer
+  regressor.add(Dense(units = 1))
+  
+  # Compiling the model
+  regressor.compile(optimizer = "adam", loss="mean_squared_error")
+  
+  # Create a checkpoint to monitor the validation loss and save the model with the best performance.
+  model_location = models_dir
+  model_name = model_name + ".model.keras"
+  best_model_checkpoint_callback = ModelCheckpoint(
+      model_location + model_name, 
+      monitor="val_loss", 
+      save_best_only=True, 
+      mode="min", 
+      verbose=0)
+
+  # Training the model
+  history = regressor.fit(
+      x = X_train,
+      y = y_train, 
+      validation_data=(X_validate, y_validate), 
+      epochs=200, 
+      batch_size = 64, 
+      callbacks = [best_model_checkpoint_callback])
+  
+  # # Visualizing model performance during training
+  # plt.figure(figsize=(18, 6))
+
+  # plt.plot(history.history["loss"], label="Training Loss")
+  # plt.plot(history.history["val_loss"], label="Validation Loss")
+
+  # plt.title("LSTM Model Performance")
+  # plt.xlabel("Epochs")
+  # plt.ylabel("Loss")
+  # plt.legend()
+  # plt.show()
+  
+  # return X_train, X_validate, X_test, y_train, y_validate, y_test
+  
+  
+  # # Prepare model location and name
+  # model_location = models_dir
+  # model_name = model_name + ".model.keras"
+
+  # # Load the best performing model
+  # best_model = load_model(model_location + model_name)
+
+  # # Save the best model
+  # best_model.save(model_location + model_name)

@@ -49,7 +49,7 @@ def preprocess_data(data_file_path, data_source_name="btc_usdt_30m", exported_da
     # Store scaler model
     os.makedirs(exported_model_path, exist_ok=True)
     scaler_model_ext = ".gz"
-    export_model_file_name = data_source_name + "_scaler" + scaler_model_ext
+    export_model_file_name = data_source_name + "_lstm_scaler" + scaler_model_ext
     scaler_path = os.path.join(exported_model_path, export_model_file_name)
     joblib.dump(sc, scaler_path)
 
