@@ -4,6 +4,12 @@ import os
 import joblib
 from sklearn.mixture import GaussianMixture
 from sklearn.impute import SimpleImputer
+from enum import Enum
+
+class Sentiment(Enum):
+    Buy = 1
+    Hold = 2 
+    Sell = 3
 
 class HMM:
     def __init__(
@@ -128,40 +134,97 @@ class HMM:
 
         print(f"HMM model trained successfully. Converged after {iteration+1} iterations.")
 
-    def backtest(self, days=30):
+    def backtest(self, initial_balance=1000, days=10, random_seed=None):
         """
         Backtest the model predictions on test data for specified number of days.
         Args:
-            days: Number of days to backtest (default 30)
+            initial_balance: Starting balance for trading simulation (default 1000)
+            days: Number of days to backtest (default 10)
+            random_seed: Random seed for reproducibility
         Returns:
-            Dictionary containing backtest metrics
+            Dictionary containing backtest metrics and trading results
         """
         # Load test data
         _, _, test_data = self.construct_data()
         
         # Calculate number of 30-minute intervals in specified days
         intervals = days * 48  # 48 thirty-minute intervals per day
-        test_window = test_data[-intervals:]
+        
+        # Set random seed if provided
+        if random_seed is not None:
+            np.random.seed(random_seed)
+            
+        # Randomly select start index ensuring we have enough data for the test period
+        max_start_idx = len(test_data) - intervals
+        start_idx = np.random.randint(0, max_start_idx)
+        test_window = test_data[start_idx:start_idx + intervals]
         
         # Get predictions
         predictions = self.predict(test_window)
         
-        # Calculate actual price changes
-        actual_changes = np.diff(test_window[:, self.features.index('close')])
-        actual_trends = ['positive' if change > 0 else 'negative' for change in actual_changes]
+        # Initialize trading variables
+        balance = initial_balance
+        position = None
+        trades = []
         
-        # Compare predictions with actual trends
-        correct_predictions = sum(1 for i in range(len(actual_trends)) 
-                                if predictions['prediction'] == actual_trends[i])
+        # Simulate trading
+        for i in range(len(test_window) - 1):
+            current_price = test_window[i, self.features.index('close')]
+            next_price = test_window[i + 1, self.features.index('close')]
+            
+            if predictions['prediction'] == 'positive' and position is None:
+                # Buy
+                position = balance / current_price
+                entry_price = current_price
+                entry_time = i
+            elif predictions['prediction'] == 'negative' and position is not None:
+                # Sell
+                profit = position * (current_price - entry_price)
+                balance = balance + profit
+                trades.append({
+                    'entry_time': entry_time,
+                    'exit_time': i,
+                    'entry_price': entry_price,
+                    'exit_price': current_price,
+                    'profit': profit,
+                    'profit_pct': (profit / (position * entry_price)) * 100
+                })
+                position = None
         
-        accuracy = correct_predictions / len(actual_trends)
+        # Close any remaining position
+        if position is not None:
+            final_price = test_window[-1, self.features.index('close')]
+            profit = position * (final_price - entry_price)
+            balance = balance + profit
+            trades.append({
+                'entry_time': entry_time,
+                'exit_time': len(test_window) - 1,
+                'entry_price': entry_price,
+                'exit_price': final_price,
+                'profit': profit,
+                'profit_pct': (profit / (position * entry_price)) * 100
+            })
+        
+        # Sort trades by profit
+        sorted_trades = sorted(trades, key=lambda x: x['profit'], reverse=True)
+        best_trades = sorted_trades[:5]
+        worst_trades = sorted_trades[-5:]
+        
+        print("\nBest 5 trades:")
+        for trade in best_trades:
+            print(f"Profit: ${trade['profit']:.2f} ({trade['profit_pct']:.2f}%)")
+            
+        print("\nWorst 5 trades:")
+        for trade in worst_trades:
+            print(f"Profit: ${trade['profit']:.2f} ({trade['profit_pct']:.2f}%)")
         
         return {
-            'accuracy': accuracy,
-            'test_period_days': days,
-            'total_intervals': intervals,
-            'correct_predictions': correct_predictions,
-            'predictions': predictions
+            'final_balance': balance,
+            'total_trades': len(trades),
+            'profit': balance - initial_balance,
+            'return_pct': ((balance - initial_balance) / initial_balance) * 100,
+            'best_trades': best_trades,
+            'worst_trades': worst_trades
         }
 
     def predict(self, X):

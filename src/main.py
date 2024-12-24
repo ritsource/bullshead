@@ -31,8 +31,12 @@ def main():
         if not args.hmm:
             print("Backtest is only available for HMM model")
             sys.exit(1)
-        results = model.backtest(5)
-        print(f"Backtest Results: {results}")
+        results = model.backtest(initial_balance=1000, days=5, random_seed=42)
+        print("\nBacktest Results:")
+        print(f"Final Balance: ${results['final_balance']:.2f}")
+        print(f"Total Trades: {results['total_trades']}")
+        print(f"Total Profit: ${results['profit']:.2f}")
+        print(f"Return: {results['return_pct']:.2f}%")
     elif args.serve:
         app = create_app()
         app.run(host="0.0.0.0", port=8000)
