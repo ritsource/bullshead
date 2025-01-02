@@ -143,6 +143,8 @@ class LSTM:
         # Prepare model location and name
         model_location = self.models_dir
         model_name = self.model_name + ".model.keras"
+        
+        btc_usdt_30m_lstm.model.keras
 
         # Load the best performing model
         best_model = load_model(os.path.join(model_location, model_name))

@@ -3,7 +3,7 @@ from sklearn.preprocessing import MinMaxScaler
 import joblib
 import os
 
-def preprocess_data(data_file_path, data_source_name="btc_usdt_30m", exported_data_path="data/processed/", exported_model_path="models/lstm/"):
+def preprocess_data(data_file_path, data_source_name="btc_usdt_30m", export_dir="data/processed/", exported_model_path="models/lstm/"):
     data = pd.read_csv(data_file_path)
 
     # Convert timestamp to datetime
@@ -15,13 +15,19 @@ def preprocess_data(data_file_path, data_source_name="btc_usdt_30m", exported_da
                'quote_asset_volume', 'number_of_trades',
                'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume']
     target = "close"
+    
+    # "start_date": "2023-08-07",
+    # "end_date": "2024-11-30",
+    # "intervals": [
+    #   "1d"
+    # ],
 
     # Define date ranges for train/validate/test splits
-    test_start_date = pd.to_datetime("2024-01-01")
-    test_end_date = pd.to_datetime("2024-02-29")
-    validate_start_date = pd.to_datetime("2024-03-01") 
-    validate_end_date = pd.to_datetime("2024-04-30")
-    train_start_date = pd.to_datetime("2024-05-01")
+    test_start_date = pd.to_datetime("2023-08-07")
+    test_end_date = pd.to_datetime("2024-06-30")
+    validate_start_date = pd.to_datetime("2024-07-01")
+    validate_end_date = pd.to_datetime("2024-08-30")
+    train_start_date = pd.to_datetime("2024-09-01")
     train_end_date = pd.to_datetime("2024-11-30")
 
     # Split data into train/validate/test sets
@@ -63,12 +69,14 @@ def preprocess_data(data_file_path, data_source_name="btc_usdt_30m", exported_da
     data_test_scaled_df = pd.DataFrame(data_test_scaled, columns=features)
     data_test_scaled_df["open_time"] = data_test_dates.values
 
+    scaled_export_dir = os.path.join(export_dir, "scaled")
+
     # Create processed data directory if it doesn't exist
-    os.makedirs(exported_data_path, exist_ok=True)
+    os.makedirs(scaled_export_dir, exist_ok=True)
 
     # Store processed datasets
-    data_train_scaled_df.to_csv(os.path.join(exported_data_path, f"{data_source_name}_train_scaled.csv"), index=False)
-    data_validate_scaled_df.to_csv(os.path.join(exported_data_path, f"{data_source_name}_validate_scaled.csv"), index=False)
-    data_test_scaled_df.to_csv(os.path.join(exported_data_path, f"{data_source_name}_test_scaled.csv"), index=False)
+    data_train_scaled_df.to_csv(os.path.join(scaled_export_dir, f"{data_source_name}_train.csv"), index=False)
+    data_validate_scaled_df.to_csv(os.path.join(scaled_export_dir, f"{data_source_name}_validate.csv"), index=False)
+    data_test_scaled_df.to_csv(os.path.join(scaled_export_dir, f"{data_source_name}_test.csv"), index=False)
 
     return data_train_scaled_df, data_validate_scaled_df, data_test_scaled_df

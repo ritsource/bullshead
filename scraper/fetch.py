@@ -3,47 +3,56 @@ import requests
 import json
 from datetime import datetime, timedelta
 
-# Directory to save downloaded files
-download_dir = "binance_data"
-
 config = json.load(open("config.json"))
+
 sources = config["sources"]
 intervals = config["intervals"]
 
 start_date = datetime.strptime(config["start_date"], "%Y-%m-%d")
 end_date = datetime.strptime(config["end_date"], "%Y-%m-%d")
 
-# Create the directory if it doesn't exist
-os.makedirs(download_dir, exist_ok=True)
+def build_file_url(base_url, aggrigate, symbol, interval, formatted_date):
+    if aggrigate == "monthly":
+        # For monthly files, only use YYYY-MM format
+        formatted_date = formatted_date[:7]
+    return f"{base_url}/{interval}/{symbol}-{interval}-{formatted_date}.zip"
 
-def build_file_url(base_url, symbol, interval, date):
-    return f"{base_url}/{interval}/{symbol}-{interval}-{date}.zip"
+def download_files(export_dir, type, aggrigate, symbol, base_url):
+    # Create the directory if it doesn't exist
+    os.makedirs(export_dir, exist_ok=True)
 
-def download_files(name, base_url, symbol, file_name_prefix, download_dir):
     current_date = start_date
 
     file_urls = []
     
-    if name == "klines":
+    if type == "klines":
         while current_date <= end_date:
-            date_str = current_date.strftime("%Y-%m-%d")
+            if aggrigate == "monthly":
+                date_str = current_date.strftime("%Y-%m")
+                # Skip if we've already processed this month
+                if len(file_urls) > 0 and date_str in file_urls[-1]:
+                    current_date += timedelta(days=1)
+                    continue
+            else:
+                date_str = current_date.strftime("%Y-%m-%d")
+                
             for interval in intervals:
                 file_name = f"{symbol}-{interval}-{date_str}.zip"
-                file_url = build_file_url(base_url, symbol, interval, date_str)
+                file_url = build_file_url(base_url, aggrigate, symbol, interval, date_str)
                 file_urls.append(file_url)
             current_date += timedelta(days=1)
     else:
         while current_date <= end_date:
             date_str = current_date.strftime("%Y-%m-%d")
             file_name = f"{file_name_prefix}{date_str}.zip"
-            file_url = build_file_url(base_url, symbol, interval, date_str)
+            file_url = build_file_url(base_url, aggrigate, symbol, interval, date_str)
             file_urls.append(file_url)
             current_date += timedelta(days=1)
     
     print(f"Found {len(file_urls)} files to download.")
     
     # Create downloads subdirectory
-    downloads_dir = os.path.join(download_dir, "downloads")
+    downloads_dir = os.path.join(export_dir, "downloads", "")
     os.makedirs(downloads_dir, exist_ok=True)
     
     for idx, file_url in enumerate(file_urls, start=1):
@@ -75,5 +84,8 @@ def download_files(name, base_url, symbol, file_name_prefix, download_dir):
     print("Download complete.")
 
 for src in sources:
-    print(f"\nProcessing {src['name']}")
-    download_files(src["name"], src["base_url"], src["symbol"], src["file_name_prefix"], download_dir)
+    print(f"\nProcessing {src['base_url']}")
+    download_files(src["export_dir"], src["type"], src["aggrigate"], src["symbol"], src["base_url"])
+
+# https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1d/BTCUSDT-1d-2023-08-09.zip
+# https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1d/BTCUSDT-1d-2024-11.zip

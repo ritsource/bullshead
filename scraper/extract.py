@@ -2,41 +2,23 @@ import os
 import zipfile
 import json
 
-# Base URL for direct file downloads
-base_url = "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDC/"
-
-# Directory to save downloaded files
-download_dir = "binance_data/downloads"
-output_dir = "binance_data"
-
 config = json.load(open("config.json"))
 sources = config["sources"]
 intervals = config["intervals"]
 
-# Create the directories if they don't exist
-os.makedirs(download_dir, exist_ok=True)
-os.makedirs(output_dir, exist_ok=True)
-
-def extract_files(file_name_prefix, download_dir, source_name):
-    print(f"\nExtracting {source_name} files...")
+def extract_files(export_dir, type):
+    print(f"\nExtracting {type} files...")
     
-    # Create source directory in output_dir
-    extract_dir = os.path.join(output_dir, source_name)
+    # Get downloads directory
+    downloads_dir = os.path.join(export_dir, "downloads")
+    
+    # Create extract directory
+    extract_dir = os.path.join(export_dir, "extracted")
     os.makedirs(extract_dir, exist_ok=True)
         
-    for file in os.listdir(download_dir):
-        matches = False
-        if source_name == "klines":
-            for interval in intervals:
-                if file.startswith(file_name_prefix + interval) and file.endswith('.zip'):
-                    matches = True
-                    break
-        else:
-            if file.startswith(file_name_prefix) and file.endswith('.zip'):
-                matches = True
-                
-        if matches:
-            zip_path = os.path.join(download_dir, file)
+    for file in os.listdir(downloads_dir):
+        if file.endswith('.zip'):
+            zip_path = os.path.join(downloads_dir, file)
             
             try:
                 # Verify zip file integrity before extracting
@@ -52,8 +34,8 @@ def extract_files(file_name_prefix, download_dir, source_name):
             except Exception as e:
                 print(f"Failed to extract {file}: {str(e)}")
     
-    print(f"Finished extracting {source_name} files")
+    print(f"Finished extracting {type} files")
 
 for src in sources:
-    print(f"\nProcessing {src['name']}")
-    extract_files(src["file_name_prefix"], download_dir, src["name"])
+    print(f"\nProcessing {src['base_url']}")
+    extract_files(src["export_dir"], src["type"])

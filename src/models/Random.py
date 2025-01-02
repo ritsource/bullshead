@@ -1,21 +1,15 @@
-import random
+import numpy as np
+from models.HMM import Sentiment
 
 class Random:
     def __init__(self):
-        pass
-    
-    def train(self, *args, **kwargs):
-        """
-        Random model does not require training.
-        """
-        print("Random model does not require training.")
+        self.sentiments = [Sentiment.Buy, Sentiment.Hold, Sentiment.Sell]
 
-    def predict(self, *args, **kwargs):
-        """
-        Randomly predict positive or negative.
-        Returns:
-            {"prediction": "positive"/"negative", "confidence": float}
-        """
-        prediction = random.choice(["positive", "negative"])
-        confidence = round(random.uniform(0.5, 1.0), 2)
-        return {"prediction": prediction, "confidence": confidence}
+    def predict(self, data=None):
+        return {
+            'prediction': np.random.choice(self.sentiments),
+            'confidence': 1/3
+        }
+
+    def train(self, *args, **kwargs):
+        pass
