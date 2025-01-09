@@ -19,35 +19,27 @@ import numpy as np
 device = "cpu"
 print(f"Using {device} device")
 
-
-DIRECTION_COLORS = {
-    'green': '#16C47F',
-    'yellow': '#FFC145', 
-    'red': '#D84040'
-}
-
-
 class Result(Enum):
-    Neutral = 0
-    TargetPositive = 1
-    Positive = 2
-    Negative = 3
+    TargetPositive = 0
+    Positive = 1 
+    Negative = 2
+    Neutral = 3
 
-# class ResultSequence(Enum):
-#     Other = 0
-#     Target1 = 1
-#     # Target2 = 2
+class ResultSequence(Enum):
+    Other = 0
+    Target1 = 1
+    # Target2 = 2
 
 # Define model
 class NeuralNetwork(nn.Module):
-    def __init__(self, d=16):
+    def __init__(self, d=16, N=5, X=10, SL=0.02, Q=0.5):
         super().__init__()
         
-        # self._d = d
-        # self._N = N
-        # self._X = X
-        # self._SL = SL
-        # self._Q = Q
+        self._d = d
+        self._N = N
+        self._X = X
+        self._SL = SL
+        self._Q = Q
         
         self.flatten = nn.Flatten()
         self.linear_relu_stack = nn.Sequential(
@@ -61,7 +53,7 @@ class NeuralNetwork(nn.Module):
             # nn.ReLU(),
             # nn.Linear(d, d),
             # nn.ReLU(),
-            nn.Linear(d, len(Result))
+            nn.Linear(d, len(ResultSequence))  # 3 classes for direction + 1 for movement
         )
         self.softmax = nn.Softmax(dim=1)
 
@@ -70,10 +62,6 @@ class NeuralNetwork(nn.Module):
         direction = self.softmax(logits[:, :3])  # First 3 outputs for Up/Down/Neutral
         movement = logits[:, 3].unsqueeze(1)  # Last output for movement
         return torch.cat((direction, movement), dim=1)
-    
-    # def forward(self, x):
-    #     logits = self.linear_relu_stack(x)
-    #     return logits
 
 class CustomDataset(Dataset):
     def __init__(self, features, labels):
@@ -85,12 +73,10 @@ class CustomDataset(Dataset):
                 features_float[:, col_idx] = [x.timestamp() for x in features[:, col_idx]]
         
         self.features = torch.FloatTensor(features_float.astype(float))
-        # Convert labels to one-hot encoding
-        self.labels = torch.nn.functional.one_hot(
-            torch.tensor(labels[0].flatten(), dtype=torch.long),
-            num_classes=len(Result)
-        ).float()
-    
+        # Convert move to one-hot encoding and combine with movement
+        move_one_hot = pd.get_dummies(labels[0]).values  # One-hot encoding for Up/Down/Neutral
+        self.labels = torch.FloatTensor(np.column_stack((move_one_hot, labels[1])))
+        
     def __len__(self):
         return len(self.features)
     
@@ -125,15 +111,19 @@ class DirectionalLoss(nn.Module):
         # Combine losses
         return self.alpha * direction_loss + self.beta * movement_loss
 
+class Result(Enum):
+    Buy = "buy"
+    Sell = "sell"
+    
 class Direction(Enum):
     Up = "up"
     Down = "down"
     Neutral = "neutral"
     
 class BasicAlgorithm():
-    def __init__(self, export_dir="./models/basic_torch.pth", epochs=50, batch_size=32):
+    def __init__(self, export_dir="./models/basic_torch.pth", epochs=500, batch_size=32):
         super().__init__()
-
+        
         self._export_dir = export_dir
         
         self._epochs = epochs
@@ -153,7 +143,7 @@ class BasicAlgorithm():
     
     @staticmethod
     def processed_data_schema():
-        processed_schema = ['open_time', 'close_time', 'open', 'close', 'high', 'low']
+        processed_schema = ['open_time', 'close_time', 'open', 'close']
         # processed_schema = ['open', 'close']
         
         for i in BasicAlgorithm.get_calc_ma_range():
@@ -163,10 +153,8 @@ class BasicAlgorithm():
             for col in BasicAlgorithm.raw_data_schema():
                 processed_schema.append(f'{col}_{i}')
                 
-        # processed_schema.append('direction')
-        # processed_schema.append('movement')
-        
-        processed_schema.append('result')
+        processed_schema.append('direction')
+        processed_schema.append('movement')
                 
         return processed_schema
     
@@ -187,8 +175,7 @@ class BasicAlgorithm():
     
     @staticmethod
     def labels():
-        # return ['direction', 'movement']
-        return ['result']
+        return ['direction', 'movement']
     
     # @staticmethod
     # def movement():
@@ -227,26 +214,10 @@ class BasicAlgorithm():
         movement_buffer = 0
         
         # Determine move direction (Up/Down/Neutral)
-        # df['direction'] = Direction.Neutral.value
-        # df.loc[df['movement'] > 0 + movement_buffer, 'direction'] = Direction.Up.value
-        # df.loc[df['movement'] < 0 - movement_buffer, 'direction'] = Direction.Down.value
-        # df.loc[(df['movement'] >= 0 - movement_buffer) & (df['movement'] <= 0 + movement_buffer), 'direction'] = Direction.Neutral.value
-        
-        # Default to Neutral
-        df['result'] = Result.Neutral.value
-        
-        # Case 1: TargetPositive - Close > Open and Close-Open >= High-Open
-        # Case 2: Positive - Close > Open but Close-Open < High-Open
-        # Case 3: Negative - Close < Open
-        # Case 4: Everything else remains Neutral (default value)
-        df.loc[(df['close'] > df['open']) & ((df['close'] - df['open']) >= (df['high'] - df['close'])), 'result'] = Result.TargetPositive.value
-        df.loc[(df['close'] > df['open']) & ((df['close'] - df['open']) < (df['high'] - df['close'])), 'result'] = Result.Positive.value
-        df.loc[df['close'] < df['open'], 'result'] = Result.Negative.value
-        
-        
-        # Print count of TargetPositive results
-        target_positive_count = len(df[df['result'] == Result.TargetPositive.value])
-        print(f"Number of TargetPositive results: {target_positive_count}")
+        df['direction'] = Direction.Neutral.value
+        df.loc[df['movement'] > 0 + movement_buffer, 'direction'] = Direction.Up.value
+        df.loc[df['movement'] < 0 - movement_buffer, 'direction'] = Direction.Down.value
+        df.loc[(df['movement'] >= 0 - movement_buffer) & (df['movement'] <= 0 + movement_buffer), 'direction'] = Direction.Neutral.value
         
         # Create a new DataFrame instead of a view
         columns_to_keep = BasicAlgorithm.processed_data_schema()
@@ -266,51 +237,14 @@ class BasicAlgorithm():
         
         return training_df, test_df
     
-    def plot_candles(self, df):
+    def plot_data(self, df):
         plt.figure(figsize=(10, 6))
-        
-        # Create candlestick colors based on result
-        colors = []
-        for result in df['result']:
-            if result == Result.TargetPositive.value:
-                colors.append(DIRECTION_COLORS['green'])
-            elif result == Result.Positive.value:
-                colors.append(DIRECTION_COLORS['yellow'])
-            elif result == Result.Negative.value:
-                colors.append(DIRECTION_COLORS['red']) 
-            else:  # Neutral
-                colors.append('grey')
-                
-        # # Print column names
-        # print("\nDataframe columns:")
-        # for col in df.columns:
-        #     print(f"- {col}")
-                
-        # Plot candlesticks
-        for i in range(len(df)):
-            # Plot the candlestick body
-            plt.vlines(x=i, ymin=min(df['open'].iloc[i], df['close'].iloc[i]),
-                      ymax=max(df['open'].iloc[i], df['close'].iloc[i]),
-                      color=colors[i], linewidth=4)
-            
-            # Plot the wicks
-            plt.vlines(x=i, ymin=df['low'].iloc[i], ymax=df['high'].iloc[i],
-                      color=colors[i], linewidth=1)
-            
-        plt.title('Candlestick Chart with Result Colors')
+        plt.plot(df['open_time'], df['close'], label='Close Price')
+        # plt.plot(df['open'], df['close'], label='Close Price')
+        plt.title('Close Price Over Time')
         plt.xlabel('Time')
-        plt.ylabel('Price')
-        
-        # Create custom legend
-        from matplotlib.patches import Patch
-        legend_elements = [
-            Patch(facecolor=DIRECTION_COLORS['green'], label='Target Positive'),
-            Patch(facecolor=DIRECTION_COLORS['yellow'], label='Positive'), 
-            Patch(facecolor=DIRECTION_COLORS['red'], label='Negative'),
-            Patch(facecolor='grey', label='Neutral')
-        ]
-        plt.legend(handles=legend_elements)
-        
+        plt.ylabel('Close Price')
+        plt.legend()
         plt.show()
     
     def get_model(self):
@@ -328,7 +262,7 @@ class BasicAlgorithm():
     def train(self, model, training_df):
         training_data = CustomDataset(
             training_df[self.features()].values,  # Features
-            [training_df[self.labels()].values]  # Both labels
+            [training_df[self.labels()].values, training_df['movement'].values]  # Both labels
         )
 
         train_dataloader = DataLoader(training_data, batch_size=self._batch_size)
@@ -371,14 +305,18 @@ class BasicAlgorithm():
         test_sample = test_sample.to(device)
         with torch.no_grad():
             prediction = model(test_sample)
+            direction_probs = prediction[0, :3]  # First 3 outputs are direction probabilities
+            predicted_movement = prediction[0, 3].item()  # Fourth output is movement
             
-            # Get predicted result class
-            result_idx = torch.argmax(prediction).item()
-            result = Result(result_idx)
+            # Get predicted direction class
+            direction_idx = torch.argmax(direction_probs).item()
+            directions = [Direction.Up.value, Direction.Down.value, Direction.Neutral.value]
+            predicted_direction = directions[direction_idx]
 
         return {
-            "result": result,  # Predicted Result enum value
-            "probabilities": prediction[0].cpu().numpy()  # Array of probabilities for each Result
+            "direction": predicted_direction,  # Predicted direction class
+            "direction_probs": direction_probs.cpu().numpy(),  # Array of [Up, Down, Neutral] probabilities
+            "movement": predicted_movement  # Predicted movement value
         }
         
     def simulate(self, test_df, length=30):
@@ -401,9 +339,9 @@ class BasicAlgorithm():
         
         return predictions
         
-    def plot_predictions(self, test_df, length=30):    
-        start_idx = np.random.randint(20, len(test_df) - length)
-        end_idx = start_idx + length
+    def plot_predictions(self, test_df):    
+        start_idx = np.random.randint(20, len(test_df) - 30)
+        end_idx = start_idx + 30
         
         display_df = test_df.iloc[start_idx:end_idx].copy()
         
@@ -418,76 +356,45 @@ class BasicAlgorithm():
             test_datum = features_df.iloc[idx].astype(float).values
             test_sample = torch.FloatTensor(test_datum)
             pred = self.predict(self.get_model(), test_sample)
-            print(f"{idx+1}. {pred['result']} o,h,l,c:({int(test_df.iloc[idx]['open'])} {int(test_df.iloc[idx]['high'])}, {int(test_df.iloc[idx]['low'])}, {int(test_df.iloc[idx]['close'])})")
             predictions.append(pred)
             
         # Add predictions to display dataframe
-        display_df['predicted_probabilities'] = [p['probabilities'] for p in predictions]
-        display_df['predicted_result'] = [p['result'] for p in predictions]
+        display_df['predicted_up'] = [p['direction_probs'][0] for p in predictions]
+        display_df['predicted_down'] = [p['direction_probs'][1] for p in predictions]
+        display_df['predicted_neutral'] = [p['direction_probs'][2] for p in predictions]
+        display_df['predicted_direction'] = [p['direction'] for p in predictions]
+        display_df['predicted_movement'] = [p['movement'] for p in predictions]
         
-        # Determine actual result based on price relationships
-        display_df['actual_result'] = Result.Neutral  # Default case
+        # Determine actual direction
+        display_df['actual_direction'] = Direction.Neutral.value
+        display_df.loc[display_df['close'] > display_df['open'], 'actual_direction'] = Direction.Up.value
+        display_df.loc[display_df['close'] < display_df['open'], 'actual_direction'] = Direction.Down.value
         
-        # Case 1: Strong positive - Close > Open with large upward movement
-        display_df.loc[(display_df['close'] > display_df['open']) & 
-                      ((display_df['close'] - display_df['open']) >= (display_df['high'] - display_df['close'])),
-                      'actual_result'] = Result.TargetPositive
-        
-        # Case 2: Positive - Close > Open but smaller upward movement
-        display_df.loc[(display_df['close'] > display_df['open']) & 
-                      ((display_df['close'] - display_df['open']) < (display_df['high'] - display_df['close'])),
-                      'actual_result'] = Result.Positive
-                      
-        # Case 3: Negative - Close < Open
-        display_df.loc[display_df['close'] < display_df['open'],
-                      'actual_result'] = Result.Negative
-        
-        # Case 4: Neutral - Everything else remains as the default Result.Neutral
-        
-        # Calculate accuracy metrics
-        correct_predictions = (display_df['predicted_result'] == display_df['actual_result'])
-        incorrect_predictions = ~correct_predictions
-        
-        # Strict TargetPositive metrics
-        correct_target_strict = (display_df['predicted_result'] == Result.TargetPositive) & (display_df['actual_result'] == Result.TargetPositive)
-        incorrect_target_strict = (display_df['predicted_result'] == Result.TargetPositive) & (display_df['actual_result'] != Result.TargetPositive)
-        
-        # Dynamic TargetPositive metrics
-        correct_target_dynamic = (display_df['predicted_result'] == Result.TargetPositive) & (
-            (display_df['actual_result'] == Result.TargetPositive) | 
-            (display_df['actual_result'] == Result.Positive)
-        )
-        
-        # Dynamic incorrect - only count as incorrect if large negative movement
-        price_change = (display_df['close'] - display_df['open']) / display_df['open']
-        incorrect_target_dynamic = (display_df['predicted_result'] == Result.TargetPositive) & (
-            (display_df['actual_result'] == Result.Negative) & 
-            (abs(price_change) > 0.05)
-        )
-        
+        # Calculate accuracy
+        correct_predictions = (display_df['predicted_direction'] == display_df['actual_direction'])
         accuracy = (correct_predictions.sum() / len(correct_predictions)) * 100
         
         print(f"\nPrediction Results:")
         print(f"Total predictions: {len(correct_predictions)}")
         print(f"Correct predictions: {correct_predictions.sum()}")
-        print(f"Incorrect predictions: {incorrect_predictions.sum()}")
-        print(f"Correct target predictions (strict): {correct_target_strict.sum()}")
-        print(f"Incorrect target predictions (strict): {incorrect_target_strict.sum()}")
-        print(f"Correct target predictions (dynamic): {correct_target_dynamic.sum()}")
-        print(f"Incorrect target predictions (dynamic): {incorrect_target_dynamic.sum()}")
         print(f"Accuracy: {accuracy:.2f}%")
+        
+        # Plot confusion matrix as a bar chart
+        results = {
+            'Correct': correct_predictions.sum(),
+            'Incorrect': len(correct_predictions) - correct_predictions.sum()
+        }
         
         plt.figure(figsize=(12, 5))
         
-        # First subplot for result probabilities
+        # First subplot for direction probabilities
         plt.subplot(1, 2, 1)
         x = range(len(display_df))
-        probabilities = np.array([p for p in display_df['predicted_probabilities']])
-        plt.plot(x, probabilities[:, 0], 'g-', label='Target Positive')
-        plt.plot(x, probabilities[:, 1], 'r-', label='Positive')
-        plt.plot(x, probabilities[:, 2], 'b-', label='Negative')
+        plt.plot(x, display_df['predicted_up'], 'g-', label='Up')
+        plt.plot(x, display_df['predicted_down'], 'r-', label='Down')
+        plt.plot(x, display_df['predicted_neutral'], 'b-', label='Neutral')
         
-        plt.title('Predicted Result Probabilities Over Time')
+        plt.title('Predicted Direction Probabilities Over Time')
         plt.xlabel('Days')
         plt.ylabel('Probability')
         plt.legend()
@@ -496,25 +403,15 @@ class BasicAlgorithm():
         
         # Second subplot for accuracy bars
         plt.subplot(1, 2, 2)
-        results = [
-            ('Correct', correct_predictions.sum()),
-            ('Incorrect', incorrect_predictions.sum()),
-            ('Correct Target\nStrict', correct_target_strict.sum()),
-            ('Incorrect Target\nStrict', incorrect_target_strict.sum()),
-            ('Correct Target\nDynamic', correct_target_dynamic.sum()),
-            ('Incorrect Target\nDynamic', incorrect_target_dynamic.sum())
-        ]
-        
-        x_pos = np.arange(len(results))
-        plt.bar(x_pos, [r[1] for r in results], color=['green', 'red'] * 3)
+        plt.bar('Correct', results['Correct'], color='green')
+        plt.bar('Incorrect', results['Incorrect'], color='red')
         
         # Add value labels on bars
-        for i, (label, value) in enumerate(results):
+        for i, (label, value) in enumerate(results.items()):
             plt.text(i, value, str(int(value)), ha='center', va='bottom')
         
         plt.title('Prediction Results')
         plt.ylabel('Number of Predictions')
-        plt.xticks(x_pos, [r[0] for r in results], rotation=45, ha='right')
         plt.text(0.5, 0.95, f'Accuracy: {accuracy:.1f}%', 
                 ha='center', transform=plt.gca().transAxes)
         

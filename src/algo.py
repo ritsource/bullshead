@@ -3,7 +3,9 @@ import sys
 import pandas as pd
 import numpy as np
 import torch
-from algorithms.Basic import BasicAlgorithm
+import matplotlib.pyplot as plt
+from datetime import datetime
+from algorithms.Basic import BasicAlgorithm, Result
 
 def main():
     parser = argparse.ArgumentParser(description='ML Model CLI')
@@ -11,7 +13,10 @@ def main():
     parser.add_argument('--train', action='store_true', help='Test the model')
     parser.add_argument('--run', action='store_true', help='Preprocess the data')
     parser.add_argument('--plot', action='store_true', help='Plot the data')
-    parser.add_argument('--dev', action='store_true', help='Input the data')
+    parser.add_argument('--plot_dist', action='store_true', help='Plot the distribution of predictions')
+    # parser.add_argument('--dev', action='store_true', help='Input the data')
+    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train for')
+    parser.add_argument('--candle', action='store_true', help='Train the model')
     
     args = parser.parse_args()
 
@@ -19,40 +24,57 @@ def main():
         model_path = "./models/basic_nn_torch.pth"
         
         # Load and preprocess data
-        dataset_file_path = "scraper/binance_data_merged/klines/1d/merged.csv"
+        dataset_file_path = "data/downloads/klines/BTCUSDT/merged/1d/BTCUSDT-1d-2017-08-01-to-2024-11-30.csv"
         df = BasicAlgorithm.read_csv(dataset_file_path)
         # print(df.head())
         
-        algo = BasicAlgorithm(model_path)
+        algo = BasicAlgorithm(model_path, epochs=args.epochs)
         model = algo.get_model()
 
         training_df, test_df = BasicAlgorithm.preprocess_data(df)
         
-        print("Test DataFrame Columns:", len(test_df.columns))
-        print(test_df.columns)
+        print("3. --- training_df.shape ---\n", training_df.shape)
+        print("4. --- test_df.shape ---\n", test_df.shape)
+        
+        # print("5. --- training_df.head() ---\n", training_df.head())
+        # print("6. --- test_df.head() ---\n", test_df.head())
 
-        if args.dev:
-            # Input the data
-            close_time = test_df.iloc[20]['close_time']
-            algo.input_matrix(test_df, close_time)
-        elif args.train:
+        if args.train:
             # Train the model
             algo.train(model, training_df)
-
         elif args.run:
+            # Create a display copy of the dataframe
+            pd.set_option('display.max_columns', None)
+            display_df = test_df.copy()
+            # Keep only specified columns
+            display_df = display_df[['open_time', 'close_time', 'open', 'close']]
+            print("\nFirst 5 rows:")
+            print(display_df.head())
+            print("\nLast 5 rows:") 
+            print(display_df.tail())
+            
+            print(f"Picking a random date between 10 and {len(test_df)}")
+            
             # Pick a random index between 10 and length of test data
             random_idx = np.random.randint(10, len(test_df))
             print(f"Random index: {random_idx}")
             
-            print(test_df.head())
-            
             # Convert features to numeric types before creating tensor
-            test_datum = test_df[algo.features()].iloc[random_idx].astype(float).values
-            test_sample = torch.FloatTensor(test_datum)
+            features_df = test_df[algo.features()].copy()  # Create explicit copy
+            # Convert any timestamp columns to numeric (Unix timestamp)
+            for col in features_df.select_dtypes(include=['datetime64']).columns:
+                features_df.loc[:, col] = features_df[col].astype(np.int64) // 10**9
             
+            test_datum = features_df.iloc[random_idx].astype(float).values
+            test_sample = torch.FloatTensor(test_datum)
             print(f"Test sample shape: {test_sample.shape}")
-            print(f"Test sample values: {test_sample}")
             print(f"Any NaN in input?: {torch.isnan(test_sample).any()}")
+            
+            # Get close time and original close value
+            close_time = pd.to_datetime(test_df['close_time'].iloc[random_idx])
+            print(f"Close time: {close_time}")
+            print(f"Open (original): {test_df['open'].iloc[random_idx]:.2f}")
+            print(f"Close (original): {test_df['close'].iloc[random_idx]:.2f}")
             
             # Load trained model weights
             algo.load_weights(model, model_path)
@@ -60,13 +82,40 @@ def main():
             # Make prediction
             result = algo.predict(model, test_sample)
             print(f"\nPrediction for data point {random_idx}:")
-            print(f"Signal: {result['prediction'].value}")
-            print(f"Confidence: {result['confidence']:.2f}%")
-            print(f"Current Price: {result['current_price']:.2f}")
-            print(f"Predicted Price: {result['predicted_price']:.2f}")
+            print(f"Predicted result: {result['result']}")
+            
+            # Determine if prediction is positive/negative/neutral
+            if result['result'] == Result.Up:
+                prediction_type = "POSITIVE"
+            elif result['result'] == Result.Down:
+                prediction_type = "NEGATIVE" 
+            else:
+                prediction_type = "NEUTRAL"
                 
-        if args.plot:
-            algo.plot_data(training_df)
+            print(f"Prediction type: {prediction_type}")
+            # print(f"Probabilities:")
+            # print(f"  Up: {result['probabilities'][0]:.2%}")
+            # print(f"  Down: {result['probabilities'][1]:.2%}") 
+            # print(f"  Neutral: {result['probabilities'][2]:.2%}")
+            
+        elif args.plot:
+            # Plot test data
+            print("\nPlotting test data...")
+            preds = algo.plot_predictions(test_df, length=60)
+            print(f"Predictions: {len(preds)}")
+            print(preds)
+            
+        elif args.candle:
+            print("Plotting candles...")
+            # Get random 7 day window from test_df
+            start_idx = np.random.randint(0, len(test_df) - 90)
+            plot_df = test_df.iloc[start_idx:start_idx + 90]
+            
+            print(plot_df.head())
+            algo.plot_candles(plot_df)
+            
+        elif args.plot_dist:
+            algo.simulate(test_df, length=90)
     else:
         parser.print_help()
         sys.exit(1)
