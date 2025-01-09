@@ -385,21 +385,61 @@ class BasicAlgorithm():
         start_idx = np.random.randint(20, len(test_df) - length)
         end_idx = start_idx + length
         
-        display_df = test_df.iloc[start_idx:end_idx].copy()
+        display_df = test_df.iloc[start_idx:end_idx+1].copy()  # +1 to get next day's prices
         
         features_df = test_df[self.features()].copy()
         # Updated datetime conversion
         for col in features_df.select_dtypes(include=['datetime64']).columns:
             features_df[col] = pd.to_numeric(features_df[col].astype(np.int64)) // 10**9
         
-        predictions = []
+        balance = 1000  # Starting USDT balance
+        holdings = 0    # Amount of crypto held
+        num_buy = 0
+        num_sell = 0 
+        num_hold = 0
+        
         for idx in range(start_idx, end_idx):
+            # Get prediction for current day
             test_datum = features_df.iloc[idx].astype(float).values
             test_sample = torch.FloatTensor(test_datum)
             pred = self.predict(self.get_model(), test_sample)
-            predictions.append(pred)
+            
+            current_price = display_df.iloc[idx-start_idx]['close']
+            next_price = display_df.iloc[idx-start_idx+1]['close']
+            
+            # Execute trading logic
+            if pred['result'] == Result.TargetPositive and balance > 0:
+                # Buy
+                holdings = balance / current_price
+                balance = 0
+                num_buy += 1
+            elif pred['result'] == Result.Negative and holdings > 0:
+                # Sell
+                balance = holdings * current_price
+                holdings = 0
+                num_sell += 1
+            else:
+                # Hold
+                num_hold += 1
+                
+        # Calculate final balance based on last price
+        final_balance = balance
+        if holdings > 0:
+            final_balance = holdings * display_df.iloc[-1]['close']
+            
+        print(f"Original: 1000 USDT")
+        print(f"Number of Buy: {num_buy}")
+        print(f"Number of Sell: {num_sell}")
+        print(f"Number of Hold: {num_hold}")
+        print(f"Current: {final_balance:.2f} USDT")
         
-        return predictions
+        return {
+            'original': 1000,
+            'buys': num_buy,
+            'sells': num_sell,
+            'holds': num_hold,
+            'final': final_balance
+        }
         
     def plot_predictions(self, test_df, length=30):    
         start_idx = np.random.randint(20, len(test_df) - length)

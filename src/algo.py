@@ -17,6 +17,7 @@ def main():
     # parser.add_argument('--dev', action='store_true', help='Input the data')
     parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train for')
     parser.add_argument('--candle', action='store_true', help='Train the model')
+    parser.add_argument('--sim', action='store_true', help='Train the model')
     
     args = parser.parse_args()
 
@@ -33,8 +34,8 @@ def main():
 
         training_df, test_df = BasicAlgorithm.preprocess_data(df)
         
-        print("3. --- training_df.shape ---\n", training_df.shape)
-        print("4. --- test_df.shape ---\n", test_df.shape)
+        # print("3. --- training_df.shape ---\n", training_df.shape)
+        # print("4. --- test_df.shape ---\n", test_df.shape)
         
         # print("5. --- training_df.head() ---\n", training_df.head())
         # print("6. --- test_df.head() ---\n", test_df.head())
@@ -42,6 +43,9 @@ def main():
         if args.train:
             # Train the model
             algo.train(model, training_df)
+        elif args.sim:
+            # Run simulation
+            algo.simulate(test_df, length=60)
         elif args.run:
             # Create a display copy of the dataframe
             pd.set_option('display.max_columns', None)
