@@ -397,6 +397,7 @@ class BasicAlgorithm():
         num_buy = 0
         num_sell = 0 
         num_hold = 0
+        entry_price = 0  # Track entry price for stop loss
         
         for idx in range(start_idx, end_idx):
             # Get prediction for current day
@@ -407,11 +408,22 @@ class BasicAlgorithm():
             current_price = display_df.iloc[idx-start_idx]['close']
             next_price = display_df.iloc[idx-start_idx+1]['close']
             
+            # Check stop loss if holding position
+            if holdings > 0:
+                loss_pct = (current_price - entry_price) / entry_price
+                if loss_pct <= -0.05:  # 5% stop loss
+                    # Sell at stop loss
+                    balance = holdings * current_price
+                    holdings = 0
+                    num_sell += 1
+                    continue
+            
             # Execute trading logic
             if pred['result'] == Result.TargetPositive and balance > 0:
                 # Buy
                 holdings = balance / current_price
                 balance = 0
+                entry_price = current_price  # Set entry price for stop loss
                 num_buy += 1
             elif pred['result'] == Result.Negative and holdings > 0:
                 # Sell

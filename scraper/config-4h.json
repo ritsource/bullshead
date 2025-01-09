@@ -1,0 +1,130 @@
+{
+  "start_date": "2017-08-01",
+  "end_date": "2024-11-30",
+  "intervals": [
+    "4h"
+  ],
+  "sources": [
+    {
+      "export_dir": "data/downloads/klines/BTCUSDT",
+      "type": "klines",
+      "aggrigate": "monthly",
+      "symbol": "BTCUSDT",
+      "base_url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT"
+    }
+  ],
+  "agg-trades-schema": [
+    {
+      "name": "aggregate tradeId",
+      "type": "number"
+    },
+    {
+      "name": "price",
+      "type": "number"
+    },
+    {
+      "name": "quantity",
+      "type": "number"
+    },
+    {
+      "name": "first_trade_id",
+      "type": "number"
+    },
+    {
+      "name": "last_trade_id",
+      "type": "number"
+    },
+    {
+      "name": "timestamp",
+      "type": "number"
+    },
+    {
+      "name": "was_the_buyer_the_maker",
+      "type": "boolean"
+    },
+    {
+      "name": "was_the_trade_the_best_price_match",
+      "type": "boolean"
+    }
+  ],
+  "klines-schema": [
+    {
+      "name": "open_time",
+      "type": "number"
+    },
+    {
+      "name": "open",
+      "type": "number"
+    },
+    {
+      "name": "high",
+      "type": "number"
+    },
+    {
+      "name": "low",
+      "type": "number"
+    },
+    {
+      "name": "close",
+      "type": "number"
+    },
+    {
+      "name": "volume",
+      "type": "number"
+    },
+    {
+      "name": "close_time",
+      "type": "number"
+    },
+    {
+      "name": "quote_asset_volume",
+      "type": "number"
+    },
+    {
+      "name": "number_of_trades",
+      "type": "number"
+    },
+    {
+      "name": "taker_buy_base_asset_volume",
+      "type": "number"
+    },
+    {
+      "name": "taker_buy_quote_asset_volume",
+      "type": "number"
+    },
+    {
+      "name": "ignore",
+      "type": "number"
+    }
+  ],
+  "trades-schema": [
+    {
+      "name": "trade_id",
+      "type": "number"
+    },
+    {
+      "name": "price",
+      "type": "number"
+    },
+    {
+      "name": "qty",
+      "type": "number"
+    },
+    {
+      "name": "quote_qty",
+      "type": "number"
+    },
+    {
+      "name": "time",
+      "type": "number"
+    },
+    {
+      "name": "is_buyer_maker",
+      "type": "boolean"
+    },
+    {
+      "name": "is_best_match",
+      "type": "boolean"
+    }
+  ]
+}

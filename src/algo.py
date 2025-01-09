@@ -22,10 +22,10 @@ def main():
     args = parser.parse_args()
 
     if args.basic:
-        model_path = "./models/basic_nn_torch.pth"
+        model_path = "./models/basic_nn_torch_4h.pth"
         
         # Load and preprocess data
-        dataset_file_path = "data/downloads/klines/BTCUSDT/merged/1d/BTCUSDT-1d-2017-08-01-to-2024-11-30.csv"
+        dataset_file_path = "data/downloads/klines/BTCUSDT/merged/4h/BTCUSDT-4h-2017-08-01-to-2024-11-30.csv"
         df = BasicAlgorithm.read_csv(dataset_file_path)
         # print(df.head())
         
@@ -45,7 +45,9 @@ def main():
             algo.train(model, training_df)
         elif args.sim:
             # Run simulation
-            algo.simulate(test_df, length=60)
+            days = 100
+            ticks = days * 6  # 6 ticks per day (4 hour intervals)
+            algo.simulate(test_df, length=ticks)
         elif args.run:
             # Create a display copy of the dataframe
             pd.set_option('display.max_columns', None)

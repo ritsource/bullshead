@@ -1,9 +1,14 @@
 import os
 import json
 import pandas as pd
+import argparse
 
-# Load config
-config = json.load(open("config.json"))
+# Parse command line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--config', default='config.json', help='Path to config file')
+args = parser.parse_args()
+
+config = json.load(open(args.config))
 sources = config["sources"]
 intervals = config["intervals"]
 
