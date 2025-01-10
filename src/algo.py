@@ -6,6 +6,7 @@ import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
 from algorithms.Basic import BasicAlgorithm, Result
+from plotter.plotter import plot_trades_on_candle
 
 def main():
     parser = argparse.ArgumentParser(description='ML Model CLI')
@@ -15,21 +16,22 @@ def main():
     parser.add_argument('--plot', action='store_true', help='Plot the data')
     parser.add_argument('--plot_dist', action='store_true', help='Plot the distribution of predictions')
     # parser.add_argument('--dev', action='store_true', help='Input the data')
-    parser.add_argument('--epochs', type=int, default=500, help='Number of epochs to train for')
+    parser.add_argument('--epochs', type=int, default=350, help='Number of epochs to train for')
     parser.add_argument('--candle', action='store_true', help='Train the model')
     parser.add_argument('--sim', action='store_true', help='Train the model')
     
     args = parser.parse_args()
 
     if args.basic:
-        model_path = "./models/basic_nn_torch_4h.pth"
+        model_path = "./models/basic_nn_torch_1d.pth"
         
         # Load and preprocess data
-        dataset_file_path = "data/downloads/klines/BTCUSDT/merged/4h/BTCUSDT-4h-2017-08-01-to-2024-11-30.csv"
+        # dataset_file_path = "data/downloads/klines/BTCUSDT/merged/4h/BTCUSDT-4h-2017-08-01-to-2024-11-30.csv"
+        dataset_file_path = "data/downloads/klines/BTCUSDT/merged/1d/BTCUSDT-1d-2017-08-01-to-2024-11-30.csv"
         df = BasicAlgorithm.read_csv(dataset_file_path)
         # print(df.head())
         
-        algo = BasicAlgorithm(model_path, epochs=args.epochs)
+        algo = BasicAlgorithm(model_path, epochs=1100)
         model = algo.get_model()
 
         training_df, test_df = BasicAlgorithm.preprocess_data(df)
@@ -45,9 +47,10 @@ def main():
             algo.train(model, training_df)
         elif args.sim:
             # Run simulation
-            days = 100
+            days = 200
             ticks = days * 6  # 6 ticks per day (4 hour intervals)
-            algo.simulate(test_df, length=ticks)
+            results = algo.simulate(test_df, length=days)
+            plot_trades_on_candle(results['display_df'], results['trades'], results['buys'], results['sells'])
         elif args.run:
             # Create a display copy of the dataframe
             pd.set_option('display.max_columns', None)

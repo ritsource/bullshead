@@ -7,6 +7,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from enum import Enum
 import numpy as np
+from backtest.backtest import Backtester
+from interfaces.algo import Result
+from constants import colors
+from plotter.plotter import plot_trades
 
 # Get cpu, gpu or mps device for training.
 # device = (
@@ -19,26 +23,6 @@ import numpy as np
 device = "cpu"
 print(f"Using {device} device")
 
-
-DIRECTION_COLORS = {
-    'green': '#16C47F',
-    'yellow': '#FFC145', 
-    'red': '#D84040'
-}
-
-
-class Result(Enum):
-    Neutral = 0
-    TargetPositive = 1
-    Positive = 2
-    Negative = 3
-
-# class ResultSequence(Enum):
-#     Other = 0
-#     Target1 = 1
-#     # Target2 = 2
-
-# Define model
 class NeuralNetwork(nn.Module):
     def __init__(self, d=16):
         super().__init__()
@@ -172,7 +156,7 @@ class BasicAlgorithm():
     
     @staticmethod
     def get_calc_ma_range():
-        return [1, 5, 10, 20];
+        return [5, 10, 20, 40, 80];
     
     @staticmethod
     def get_price_history_range():
@@ -246,7 +230,6 @@ class BasicAlgorithm():
         
         # Print count of TargetPositive results
         target_positive_count = len(df[df['result'] == Result.TargetPositive.value])
-        print(f"Number of TargetPositive results: {target_positive_count}")
         
         # Create a new DataFrame instead of a view
         columns_to_keep = BasicAlgorithm.processed_data_schema()
@@ -273,11 +256,11 @@ class BasicAlgorithm():
         colors = []
         for result in df['result']:
             if result == Result.TargetPositive.value:
-                colors.append(DIRECTION_COLORS['green'])
+                colors.append(colors.GREEN)
             elif result == Result.Positive.value:
-                colors.append(DIRECTION_COLORS['yellow'])
+                colors.append(colors.YELLOW)
             elif result == Result.Negative.value:
-                colors.append(DIRECTION_COLORS['red']) 
+                colors.append(colors.RED) 
             else:  # Neutral
                 colors.append('grey')
                 
@@ -304,9 +287,9 @@ class BasicAlgorithm():
         # Create custom legend
         from matplotlib.patches import Patch
         legend_elements = [
-            Patch(facecolor=DIRECTION_COLORS['green'], label='Target Positive'),
-            Patch(facecolor=DIRECTION_COLORS['yellow'], label='Positive'), 
-            Patch(facecolor=DIRECTION_COLORS['red'], label='Negative'),
+            Patch(facecolor=colors.GREEN, label='Target Positive'),
+            Patch(facecolor=colors.YELLOW, label='Positive'), 
+            Patch(facecolor=colors.RED, label='Negative'),
             Patch(facecolor='grey', label='Neutral')
         ]
         plt.legend(handles=legend_elements)
@@ -381,7 +364,25 @@ class BasicAlgorithm():
             "probabilities": prediction[0].cpu().numpy()  # Array of probabilities for each Result
         }
         
-    def simulate(self, test_df, length=30):
+    def simulate(self, df, length=100, log_trades=True):
+        s = Backtester(self, initial_balance=1000)
+        results = s.rand(df, length)
+
+        if log_trades:
+            # Sort and print trades by percentage gain
+            if results['trades']:
+                sorted_trades = sorted(results['trades'], key=lambda x: x['pct_change'], reverse=True)
+                print("\nTrades sorted by gain:")
+                for trade in sorted_trades:
+                    print(f"Bought at {trade['buy_price']}, sold at {trade['sell_price']} ({'+' if trade['pct_change'] >= 0 else ''}{trade['pct_change']:.2f}%)")
+
+        print(f"B/S/H: {len(results['buys'])} / {len(results['sells'])} / {len(results['holds'])}")
+        print(f"Original: {results['original']}")
+        print(f"Final: {results['final']}")
+        
+        return results;
+        
+    def simulate_old(self, test_df, length=30):
         start_idx = np.random.randint(20, len(test_df) - length)
         end_idx = start_idx + length
         

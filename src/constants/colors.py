@@ -1,0 +1,3 @@
+GREEN = "#16C47F"
+YELLOW = "#FFC145"
+RED = "#D84040"
