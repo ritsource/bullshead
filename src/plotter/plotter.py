@@ -73,7 +73,7 @@ def plot_trades_on_candle(display_df, trades, buys, sells):
         date = buy['date'].tz_localize(None).tz_localize('UTC')
         ax.text(date, buy['price'], f'({buy["entry_idx"]})', color=colors.GREEN, fontsize=7, weight='bold',
                horizontalalignment='center', verticalalignment='bottom',
-               bbox=dict(facecolor='white', edgecolor=colors.GREEN, alpha=0.2))
+               bbox=dict(facecolor='white', edgecolor=colors.GREEN, alpha=0.8))
         
     # Plot sell points
     for sell in sells:
@@ -83,7 +83,7 @@ def plot_trades_on_candle(display_df, trades, buys, sells):
         label = ('*' if sell['event'] == 'stoploss' else '') + f'({sell["entry_idx"]})'
         ax.text(date, sell['price'], label, color=colors.RED, fontsize=7, weight='bold',
                horizontalalignment='center', verticalalignment='top',
-               bbox=dict(facecolor='white', edgecolor=colors.RED, alpha=0.2))
+               bbox=dict(facecolor='white', edgecolor=colors.RED, alpha=0.8))
 
     # Customize plot
     ax.set_title('Trading Activity (Candlestick)')

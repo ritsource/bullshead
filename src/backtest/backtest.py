@@ -5,6 +5,7 @@ import numpy as np
 import torch
 # from algorithms.Basic import Result
 from interfaces.algo import Result
+from interfaces.backtest import BacktestResult
 
 # SimulatorParallel
 class Backtester:
