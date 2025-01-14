@@ -28,19 +28,33 @@ def main():
         # Load and preprocess data
         # dataset_file_path = "data/downloads/klines/BTCUSDT/merged/4h/BTCUSDT-4h-2017-08-01-to-2024-11-30.csv"
         dataset_file_path = "data/downloads/klines/BTCUSDT/merged/1d/BTCUSDT-1d-2017-08-01-to-2024-11-30.csv"
-        df = BasicAlgorithm.read_csv(dataset_file_path)
+        df = BasicAlgorithm.read_csv_file(dataset_file_path)
         # print(df.head())
         
-        algo = BasicAlgorithm(model_path, epochs=1100)
+        algo = BasicAlgorithm(model_path, epochs=args.epochs)
         model = algo.get_model()
 
         training_df, test_df = BasicAlgorithm.preprocess_data(df)
+        
+        # # Plot distribution of results in training data
+        # plt.figure(figsize=(10, 6))
+        # result_counts = training_df['result'].value_counts()
+        # result_names = [Result(i).name for i in result_counts.index]
+        # plt.bar(result_names, result_counts.values)
+        # plt.title('Distribution of Results in Training Data')
+        # plt.xlabel('Result Class')
+        # plt.ylabel('Count')
+        # plt.xticks(rotation=45)
+        # plt.tight_layout()
+        # plt.show()
         
         # print("3. --- training_df.shape ---\n", training_df.shape)
         # print("4. --- test_df.shape ---\n", test_df.shape)
         
         # print("5. --- training_df.head() ---\n", training_df.head())
         # print("6. --- test_df.head() ---\n", test_df.head())
+        
+        # return
 
         if args.train:
             # Train the model
@@ -50,7 +64,8 @@ def main():
             days = 200
             ticks = days * 6  # 6 ticks per day (4 hour intervals)
             results = algo.simulate(test_df, length=days)
-            plot_trades_on_candle(results['display_df'], results['trades'], results['buys'], results['sells'])
+            
+            # plot_trades_on_candle(results['display_df'], results['trades'], results['buys'], results['sells'])
         elif args.run:
             # Create a display copy of the dataframe
             pd.set_option('display.max_columns', None)
@@ -86,7 +101,7 @@ def main():
             print(f"Close (original): {test_df['close'].iloc[random_idx]:.2f}")
             
             # Load trained model weights
-            algo.load_weights(model, model_path)
+            algo.load_weights(model_path)
             
             # Make prediction
             result = algo.predict(model, test_sample)
@@ -124,7 +139,9 @@ def main():
             algo.plot_candles(plot_df)
             
         elif args.plot_dist:
-            algo.simulate(test_df, length=90)
+            results = algo.simulate(test_df, length=90)
+            print(f"Original balance: ${results['original']:.2f}")
+            print(f"Final balance: ${results['final']:.2f}")
     else:
         parser.print_help()
         sys.exit(1)

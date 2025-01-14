@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from enum import Enum
 import numpy as np
-from backtest.backtest import Backtester
+# from backtest.backtest import Backtester
 from interfaces.algo import Result
 from constants import colors
 from plotter.plotter import plot_trades
@@ -163,6 +163,18 @@ class BasicAlgorithm():
         return range(1, 11)
     
     @staticmethod
+    def price_history_range():
+        return range(1, 11)
+    
+    @staticmethod
+    def moving_average_points():
+        return [5, 10, 20, 40, 80]
+        
+    @staticmethod
+    def min_required_context_length():
+        return max(BasicAlgorithm.moving_average_points().pop(), BasicAlgorithm.price_history_range().pop())
+    
+    @staticmethod
     def features():
         labels = BasicAlgorithm.labels()
         features = [col for col in BasicAlgorithm.processed_data_schema() if col not in labels]
@@ -179,7 +191,7 @@ class BasicAlgorithm():
     #     return 'movement'
     
     @staticmethod
-    def read_csv(file_path = "./scraper/binance_data_merged/klines/1d/merged.csv"):
+    def read_csv_file(file_path = "./scraper/binance_data_merged/klines/1d/merged.csv"):
         df = pd.read_csv(file_path)
 
         df['open_time'] = pd.to_datetime(df['open_time'], unit='ms')
@@ -365,22 +377,23 @@ class BasicAlgorithm():
         }
         
     def simulate(self, df, length=100, log_trades=True):
-        s = Backtester(self, initial_balance=1000)
-        results = s.rand(df, length)
+        pass
+        # s = Backtester(self, initial_balance=1000)
+        # results = s.rand(df, length)
 
-        if log_trades:
-            # Sort and print trades by percentage gain
-            if results['trades']:
-                sorted_trades = sorted(results['trades'], key=lambda x: x['pct_change'], reverse=True)
-                print("\nTrades sorted by gain:")
-                for trade in sorted_trades:
-                    print(f"Bought at {trade['buy_price']}, sold at {trade['sell_price']} ({'+' if trade['pct_change'] >= 0 else ''}{trade['pct_change']:.2f}%)")
+        # if log_trades:
+        #     # Sort and print trades by percentage gain
+        #     if results['trades']:
+        #         sorted_trades = sorted(results['trades'], key=lambda x: x['pct_change'], reverse=True)
+        #         print("\nTrades sorted by gain:")
+        #         for trade in sorted_trades:
+        #             print(f"Bought at {trade['buy_price']}, sold at {trade['sell_price']} ({'+' if trade['pct_change'] >= 0 else ''}{trade['pct_change']:.2f}%)")
 
-        print(f"B/S/H: {len(results['buys'])} / {len(results['sells'])} / {len(results['holds'])}")
-        print(f"Original: {results['original']}")
-        print(f"Final: {results['final']}")
+        # print(f"B/S/H: {len(results['buys'])} / {len(results['sells'])} / {len(results['holds'])}")
+        # print(f"Original: {results['original']}")
+        # print(f"Final: {results['final']}")
         
-        return results;
+        # return results;
         
     def simulate_old(self, test_df, length=30):
         start_idx = np.random.randint(20, len(test_df) - length)

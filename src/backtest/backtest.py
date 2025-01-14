@@ -3,52 +3,130 @@ import pandas as pd
 from typing import Dict
 import numpy as np
 import torch
-# from algorithms.Basic import Result
+from algorithms.BasicClassification import Output
 from interfaces.algo import Result
-from interfaces.backtest import BacktestResult
+import uuid
+from enum import Enum
+from algorithms.types import Output
 
-# SimulatorParallel
+class TradeSide(Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+    
+class Trade:
+    def __init__(self, side, amount, price):
+        self.side = side
+        self.price = price
+        
+    def buy(self, amount, price):
+        Trade(TradeSide.BUY, amount, price)
+        
+    def sell(self, amount, price):
+        Trade(TradeSide.SELL, amount, price)
+
+class Holding:
+    def __init__(self, amount, price):
+        self.id = uuid.uuid4()
+        self.amount = amount
+        self.bought_at = price
+
+    def __add__(self, other):
+        if isinstance(other, (int, float)):
+            return Holding(self.amount + other, self.bought_at)
+        elif isinstance(other, Holding):
+            # Average the bought_at price weighted by amounts
+            total_amount = self.amount + other.amount
+            avg_price = (self.bought_at * self.amount + other.bought_at * other.amount) / total_amount
+            return Holding(total_amount, avg_price)
+        else:
+            raise TypeError("Unsupported operand type")
+            
+    def __sub__(self, other):
+        if isinstance(other, (int, float)):
+            return Holding(self.amount - other, self.bought_at)
+        elif isinstance(other, Holding):
+            return Holding(self.amount - other.amount, self.bought_at)
+        else:
+            raise TypeError("Unsupported operand type")
+            
+    def __mul__(self, other):
+        if isinstance(other, (int, float)):
+            return Holding(self.amount * other, self.bought_at)
+        else:
+            raise TypeError("Can only multiply by numbers")
+            
+    def __lt__(self, other):
+        if isinstance(other, Holding):
+            return self.amount < other.amount
+        return NotImplemented
+
+    def __radd__(self, other):
+        if other == 0:
+            return self
+        return self.__add__(other)
+     
+    def value(self, at_price):
+        return self.amount * at_price
+    
+    def pct_change(self, at_price):
+        return (at_price - self.bought_at) / self.bought_at
+
 class Backtester:
-    def __init__(self, algo, initial_balance: int = 1000):
+    def __init__(self, algo):
         self._algo = algo
-        self._total_balance = initial_balance
-        self._balance = initial_balance
-        self._holdings = 0
+        self._balance = 0
+        self._holdings = []
+        self._default_stoploss_pct = 2
+        self._holding_period_limit = 5
+        self._history = []
+        self._trades = []
     
     def buy(self, price: float, amount: float):
         self._balance -= price * amount
-        self._holdings += amount
+        self._holdings.append(Holding(amount, price))
         
-    def sell(self, price: float, amount: float):
+    def sell(self, price: float, holdings: list[Holding]):
+        amount = sum(holdings)
         self._balance += price * amount
-        self._holdings -= amount
+        self._holdings = [h for h in self._holdings if h.id not in [h.id for h in holdings]]
+    
+    def record_history(self, call, price):
+        self._history.append({
+            'call': call,
+            'price': price,
+        })
+    
+    def record_trade(self, side, amount, price, event=None):
+        self._trades.append(Trade(side, amount, price))
+
+    def run(self, df, start, length=100, initial_balance: int = 1000, stoploss_pct: float = 2) -> Dict:
+        end = start + length
         
-    def run(self, df, start_idx, length=100) -> Dict:
-        end_idx = start_idx + length
+        stoploss_pct = stoploss_pct if isinstance(stoploss_pct, float) and 0 <= stoploss_pct <= 100 else self._default_stoploss_pct
         
-        print(df.head())
+        print(f"Running with stoploss of {stoploss_pct}%")
         
-        display_df = df.iloc[start_idx:end_idx+1].copy()
-        features_df = df[self._algo.features()].copy()
+        # print(df.head())
+        
+        display_df = df.iloc[start:end+1].copy() # display_df
+        features_df = df[self._algo.features()].copy() # features_df
+        
         # Updated datetime conversion
         for col in features_df.select_dtypes(include=['datetime64']).columns:
             features_df[col] = pd.to_numeric(features_df[col].astype(np.int64)) // 10**9
             
-        print(display_df.head())
-            
-        self._balance = self._total_balance # Use initial balance from constructor
-        self._holdings = 0
-        buys = []
-        sells = []
-        holds = []
-        entry_price = 0
-        entry_idx = 0
-        trades = [] # Track all completed trades
+        # print(display_df.head())
+
+        trades = []
+        
+        self._balance = initial_balance
+        self._holdings = []
            
         for idx in range(0, len(display_df)-1):
-            test_datum = features_df.iloc[idx+start_idx].astype(float).values
+            test_datum = features_df.iloc[idx+start].astype(float).values
             test_sample = torch.FloatTensor(test_datum)
-            pred = self._algo.predict(self._algo.get_model(), test_sample)
+            out = self._algo.predict(test_sample)
+            # print(f"out: {out}")
             
             current_price = display_df.iloc[idx]['close']
             next_price = display_df.iloc[idx+1]['close']
@@ -56,106 +134,57 @@ class Backtester:
             open_time = display_df.iloc[idx]['open_time']
             close_time = display_df.iloc[idx]['close_time']
             
-            profit_pct = ((current_price - entry_price) / entry_price) * 100
+            res = None
             
-            holding_period_limit = 5;
+            no_money = self._balance <= 0 and len(self._holdings) <= 0 and sum(self._holdings) <= 0
             
-            # Check stop loss if holding position
-            if self._holdings > 0:
-                loss_pct = (current_price - entry_price) / entry_price
-                if loss_pct <= -0.2:  # 0.5% stop loss
-                    # Sell at stop loss
-                    self.sell(current_price, self._holdings)
-                    sells.append({
-                        'price': current_price,
-                        'event': "stoploss",
-                        'date': close_time,
-                        'low': display_df.iloc[idx]['low'],
-                        'high': display_df.iloc[idx]['high'],
-                        'entry_idx': entry_idx
-                    })
-                    trades.append({
-                        'buy_price': entry_price,
-                        'sell_price': current_price,
-                        'pct_change': ((current_price - entry_price) / entry_price) * 100
-                    })
-                    continue
+            if no_money:
+                print("No money to invest, balance is 0 and no surrent holdings with value")
+                break
             
-            to_buy = pred['result'] == Result.TargetPositive and self._balance > 0
-            to_sell = self._holdings > 0 and profit_pct > 0.1 and holding_period_limit <= (idx - entry_idx)
+            prev_vals = [hold.value(hold.bought_at) for hold in self._holdings]
+            curr_vals = [hold.value(current_price) for hold in self._holdings]
             
-            # if pred['result'] == Result.Negative and profit_pct < 0.1:
-            #     to_sell = True
+            trigger_stoploss = any((cv - pv) / pv <= -0.2 for i, cv in enumerate(curr_vals) if i < len(prev_vals) and (pv := prev_vals[i]))
             
-            # Execute trading logic
-            if to_buy:
-                # Buy
+            call = out
+            
+            if trigger_stoploss:
+                call = "stoploss"
+                holds = self._holdings
+                self.sell(current_price, holds)
+                self.record_trade("sell", sum(holds), current_price)
+
+            elif out == Output.BUY:
                 amount = self._balance / current_price # Convert all USDT to asset
                 self.buy(current_price, amount)
-                entry_price = current_price
-                entry_idx = idx
-                buys.append({
-                    'price': current_price,
-                    'event': "buy",
-                    'date': open_time,
-                    'low': display_df.iloc[idx]['low'],
-                    'high': display_df.iloc[idx]['high'],
-                    'entry_idx': entry_idx
-                })
-            elif to_sell:
-                # Sell
-                self.sell(current_price, self._holdings)
-                sells.append({
-                    'price': current_price,
-                    'event': "sell",
-                    'date': close_time,
-                    'low': display_df.iloc[idx]['low'],
-                    'high': display_df.iloc[idx]['high'],
-                    'entry_idx': entry_idx
-                })
-                trades.append({
-                    'buy_price': entry_price,
-                    'sell_price': current_price,
-                    'pct_change': ((current_price - entry_price) / entry_price) * 100
-                })
-            else:
-                # Hold
-                holds.append({
-                    'price': current_price,
-                    'event': "hold",
-                    'date': close_time,
-                    'entry_idx': entry_idx
-                })
-        
-        return {
-            'total_balance': self._total_balance,
-            'balance': self._balance,
-            'holdings': self._holdings,
-            'buys': buys,
-            'sells': sells,
-            'holds': holds,
-            'display_df': display_df,
-            'trades': trades,
-        }
+                self.record_trade(call, amount, current_price)
+                
+            elif out == Output.SELL:
+                holds = self._holdings
+                self.sell(current_price, holds)
+                self.record_trade(call, sum(holds), current_price)
+                
+            elif out == Output.HOLD:
+                call = "hold"
+            
+            # print(f"call: {call}")
+            # print(f"out: {out}")
+            self.record_history(call, current_price)
 
-    def construct_results(self, results) -> Dict:
-        final_balance = results['balance'] + (results['holdings'] * results['display_df'].iloc[-1]['close'])
-        
+        return self
+
+    def result(self):
         return {
-            'original': results['total_balance'],
-            'final': final_balance,
-            'buys': results['buys'],
-            'sells': results['sells'],
-            'holds': results['holds'],
-            'trades': results['trades'],
-            'display_df': results['display_df']
+            'original': self._balance + sum(hold.value(hold.bought_at) for hold in self._holdings),
+            'final': self._balance + sum(hold.value(hold.bought_at) for hold in self._holdings),
+            'trades': self._trades,
+            'history': self._history,
         }
         
     def rand(self, df, length=100) -> Dict:
-        ma_range = self._algo.get_calc_ma_range()
-        buf = ma_range[-1]
-        start_idx = np.random.randint(buf, len(df) - length)
-        end_idx = start_idx + length
+        buf = self._algo.min_required_context_length()
+        start = np.random.randint(buf, len(df) - length)
+        end = start + length
 
-        res = self.run(df, start_idx, length)
-        return self.construct_results(res)
+        return self.run(df, start, length)
