@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from datetime import datetime
-from algorithms.BasicClassification import BasicAlgorithm, Result
+from algorithms.Basic import BasicAlgorithm, Result
 from plotter.plotter import plot_trades_on_candle
 
 def main():
@@ -32,7 +32,8 @@ def main():
         # print(df.head())
         
         algo = BasicAlgorithm(model_path, epochs=args.epochs)
-        model = algo.model()
+        model = algo.get_model()
+
         training_df, test_df = BasicAlgorithm.preprocess_data(df)
         
         # # Plot distribution of results in training data
@@ -57,12 +58,9 @@ def main():
 
         if args.train:
             # Train the model
-            algo.train(model, training_df, model_path)
+            algo.train(model, training_df)
         elif args.sim:
             # Run simulation
-            
-            algo.load_weights(model_path)
-            
             days = 200
             ticks = days * 6  # 6 ticks per day (4 hour intervals)
             results = algo.simulate(test_df, length=days)
@@ -103,7 +101,7 @@ def main():
             print(f"Close (original): {test_df['close'].iloc[random_idx]:.2f}")
             
             # Load trained model weights
-            algo.load_weights(model, model_path)
+            algo.load_weights(model_path)
             
             # Make prediction
             result = algo.predict(model, test_sample)

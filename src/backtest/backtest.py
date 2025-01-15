@@ -128,11 +128,11 @@ class Backtester:
             out = self._algo.predict(test_sample)
             # print(f"out: {out}")
             
-            current_price = display_df.iloc[idx]['close']
-            next_price = display_df.iloc[idx+1]['close']
+            current_price = display_df.iloc[idx]['open']
+            # next_price = display_df.iloc[idx+1]['open']
             
-            open_time = display_df.iloc[idx]['open_time']
-            close_time = display_df.iloc[idx]['close_time']
+            # open_time = display_df.iloc[idx]['open_time']
+            # close_time = display_df.iloc[idx]['close_time']
             
             res = None
             

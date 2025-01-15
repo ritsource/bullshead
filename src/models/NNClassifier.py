@@ -15,12 +15,13 @@ class CustomDataset(Dataset):
                 features_float[:, col_idx] = [x.timestamp() for x in features[:, col_idx]]
                 
         self.features = torch.FloatTensor(features_float.astype(float))
-        # self.features = torch.tensor(features, dtype=torch.float32)
-        # self.labels = torch.tensor(labels, dtype=torch.long).squeeze()
-        self.labels = torch.nn.functional.one_hot(
-            torch.tensor(labels.flatten(), dtype=torch.long),
-            num_classes=len(Result)
-        ).float()
+        # # self.features = torch.tensor(features, dtype=torch.float32)
+        # # self.labels = torch.tensor(labels, dtype=torch.long).squeeze()
+        # self.labels = torch.nn.functional.one_hot(
+        #     torch.tensor(labels.flatten(), dtype=torch.long),
+        #     num_classes=len(Result)
+        # ).float()
+        self.labels = torch.tensor(labels.flatten(), dtype=torch.long)
 
     def __len__(self):
         return len(self.features)
@@ -47,24 +48,17 @@ class NeuralNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(512, t),
         )
-        self.softmax = nn.Softmax(dim=1)
+        # self.softmax = nn.Softmax(dim=1)
+        self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, x):
         x = self.flatten(x)
         logits = self.linear_relu_stack(x)
-        probs = self.softmax(logits)
-        return probs
-
-# class CustomLoss(nn.Module):
-#     def __init__(self):
-#         super(CustomLoss, self).__init__()
-#         self.criterion = nn.CrossEntropyLoss()
-
-#     def forward(self, inputs, targets):
-#         return self.criterion(inputs, targets)
+        log_probs = self.softmax(logits)
+        return log_probs
 
 class NNClassifier(nn.Module):
-    def __init__(self, features, labels, epochs=50, batch_size=None, device=device):
+    def __init__(self, features, labels, epochs=50, batch_size=64, device=device):
         super(NNClassifier, self).__init__()
 
         self._features = features
@@ -76,40 +70,25 @@ class NNClassifier(nn.Module):
         self._batch_size = len(features) if batch_size is None else batch_size
         self._epochs = epochs
         self._device = device
-
-        self._model = NeuralNetwork(len(features), len(Result)).to(device)
-        # self._loss_fn = CustomLoss()
-        # self._optimizer = torch.optim.Adam(self._model.parameters(), lr=0.001)
         
-        self._criterion = nn.CrossEntropyLoss()
-        self._optimizer = torch.optim.Adam(self._model.parameters(), lr=0.001)
+        model = NeuralNetwork(len(features), len(Result)).to(device)
+        self._criterion = nn.NLLLoss()
+        self._optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=1e-3,
+            betas=(0.9, 0.999),
+            eps=1e-08,
+            weight_decay=1e-5  # L2 regularization to prevent overfitting
+        )
+        self._model = model
     
     def features(self):
         return self._features
     
     def labels(self):
         return self._labels
-    
-    def model(self):
-        return self._model
       
     def train(self, training_df, model_path):
-        # print(f"Training data shape: {training_df[self.features()].values.shape}")
-        
-        # print(f"Training data labels shape: {training_df.head()}")
-        
-        # # Print schema information about the training DataFrame
-        # print("\nTraining DataFrame Schema:")
-        # print("-" * 50)
-        # print(training_df.info())
-        # print("\nFeature columns:")
-        # for col in self.features():
-        #     print(f"{col}")
-        # print("\nLabel columns:") 
-        # for col in self.labels():
-        #     print(f"{col}: {training_df[col].dtype}")
-        # print("-" * 50)
-        
         # Create dataset and dataloader
         training_data = CustomDataset(
             training_df[self.features()].values,
@@ -134,9 +113,8 @@ class NNClassifier(nn.Module):
                 
                 features, labels = features.to(self._device), labels.to(self._device)
 
-                outputs = self._model(features)
-
-                loss = self._criterion(outputs, labels)
+                log_probs = self._model(features)
+                loss = self._criterion(log_probs, labels)
                 loss.backward()
                 
                 self._optimizer.step()
@@ -146,29 +124,6 @@ class NNClassifier(nn.Module):
             print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(train_dataloader)}")
 
         print("Training Complete")
-
-        # # Training loop
-        # for epoch in range(self._epochs):
-        #     print(f"Epoch {epoch+1}\n-------------------------------")
-        #     self._model.train()
-            
-        #     for batch, (X, y) in enumerate(train_dataloader):
-        #         X, y = X.to(self._device), y.to(self._device)
-
-        #         # Forward pass
-        #         pred = self._model(X)
-        #         loss = self._loss_fn(pred, y)
-
-        #         # Backward pass
-        #         self._optimizer.zero_grad()
-        #         loss.backward()
-        #         self._optimizer.step()
-
-        #         if batch % 100 == 0:
-        #             loss, current = loss.item(), batch * len(X)
-        #             print(f"loss: {loss:>7f}  [{current:>5d}/{len(training_data):>5d}]")
-        
-        # self._model
         
         # Save model
         torch.save(self._model.state_dict(), model_path)
@@ -192,8 +147,8 @@ class NNClassifier(nn.Module):
         # Move to device and predict
         sample = sample.to(self._device)
         with torch.no_grad():
-            pred = self._model(sample)
-            probabilities = torch.softmax(pred, dim=1)
+            log_probs = self._model(sample)
+            probabilities = torch.exp(log_probs)
             result_idx = torch.argmax(probabilities, dim=1).item()
             result = Result(result_idx)
             print(f"Result: {result}")

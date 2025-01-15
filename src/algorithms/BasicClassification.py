@@ -2,13 +2,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from models.NNClassifier import NNClassifier
+from models.NNClassifier import NNClassifier, NeuralNetwork
 from interfaces.algo import Result
 from algorithms.types import Output
 from backtest.backtest import Backtester
 from constants import colors
 from plotter.plotter import plot_trades
 from enum import Enum
+
+def get_unique_str(lst):
+    # return list(set(lst))
+    res = []
+    for item in lst:
+        if item not in res:
+            res.append(item)
+    return res
 
 class BasicAlgorithm():
     def __init__(self, model_path="./models/basic_torch.pth", epochs=50):
@@ -20,23 +28,42 @@ class BasicAlgorithm():
         return "Basic"
     
     @staticmethod
-    def raw_data_schema():
-        return ['open_time', 'close_time', 'open', 'high', 'low', 'close', 'volume', 'number_of_trades']
+    def ohlc_fields():
+        return ['open', 'high', 'low', 'close']
     
     @staticmethod
-    def processed_data_schema():
-        processed_schema = ['open_time', 'close_time', 'open', 'close', 'high', 'low']
+    def numeric_fields():
+        return ['open', 'high', 'low', 'close', 'volume', 'number_of_trades']
+    
+    @staticmethod
+    def datetime_fields():
+        return ['open_time', 'close_time']
+    
+    @staticmethod
+    def all_fields():
+        # return list(set(BasicAlgorithm.ohlc_fields() + BasicAlgorithm.numeric_fields() + BasicAlgorithm.datetime_fields()))
+        return get_unique_str(BasicAlgorithm.ohlc_fields() + BasicAlgorithm.numeric_fields() + BasicAlgorithm.datetime_fields())
+    
+    @staticmethod
+    def training_data_fields():
+        fields = []
         
         for i in BasicAlgorithm.moving_average_points():
-            processed_schema.append(f'MA{i}')
+            fields.append(f'MA{i}')
             
         for i in BasicAlgorithm.price_history_range():
-            for col in BasicAlgorithm.raw_data_schema():
-                processed_schema.append(f'{col}_{i}')
+            for col in BasicAlgorithm.numeric_fields():
+                fields.append(f'{col}_{i}')
+        
+        fields.append('open')
+        fields.append('result')
                 
-        processed_schema.append('result')
-                
-        return processed_schema
+        return fields
+    
+    @staticmethod
+    def testing_data_fields():
+        # return list(set(BasicAlgorithm.training_data_fields() + BasicAlgorithm.ohlc_fields()))
+        return get_unique_str(BasicAlgorithm.training_data_fields() + BasicAlgorithm.ohlc_fields())
     
     @staticmethod
     def price_history_range():
@@ -44,7 +71,7 @@ class BasicAlgorithm():
     
     @staticmethod
     def moving_average_points():
-        return [5, 10, 20, 40, 80]
+        return [7, 21, 49]
         
     @staticmethod
     def min_required_context_length():
@@ -53,7 +80,7 @@ class BasicAlgorithm():
     @staticmethod
     def features():
         labels = BasicAlgorithm.labels()
-        features = [col for col in BasicAlgorithm.processed_data_schema() if col not in labels]
+        features = [col for col in BasicAlgorithm.training_data_fields() if col not in labels]
         return features
     
     @staticmethod
@@ -69,76 +96,78 @@ class BasicAlgorithm():
 
     @staticmethod
     def preprocess_data(df):
-        if 'close' not in df.columns:
+        if not all(col in df.columns for col in BasicAlgorithm.ohlc_fields()):
             raise ValueError("The DataFrame must contain a 'close' column.")
         
         for i in BasicAlgorithm.moving_average_points():
             df[f'MA{i}'] = df['close'].rolling(window=i).mean()
             
         for i in BasicAlgorithm.price_history_range():
-            for col in BasicAlgorithm.raw_data_schema():
+            for col in BasicAlgorithm.numeric_fields():
                 df[f'{col}_{i}'] = df[col].shift(i)
-
         
-        # # Convert datetime columns to Unix timestamps
-        # df['open_time'] = pd.to_numeric(df['open_time'].astype(np.int64)) // 10**9
-        # df['close_time'] = pd.to_numeric(df['close_time'].astype(np.int64)) // 10**9
-        
-        # # Convert numeric columns to float32
-        # numeric_columns = ['open', 'high', 'low', 'close', 'volume', 'number_of_trades']
-        # for col in numeric_columns:
-        #     df[col] = df[col].astype(np.float32)
-            
-        # # Calculate moving averages
-        # for i in BasicAlgorithm.moving_average_points():
-        #     df[f'MA{i}'] = df['close'].rolling(window=i).mean().astype(np.float32)
-            
-        # # Calculate historical features
-        # for i in BasicAlgorithm.price_history_range():
-        #     for col in BasicAlgorithm.raw_data_schema():
-        #         df[f'{col}_{i}'] = df[col].shift(i).astype(np.float32)
-          
-        # Initialize result column with Neutral value
         df['result'] = Result.Neutral.value
+        
+        # o, h, l, c
+        # 3, 4, 1, 2
+        
+        # Single candle diagram
+        #
+        #   |-------4
+        #   |
+        #  _|__-----3
+        # |    |
+        # |    |
+        # |____|----2
+        #   |
+        #   |
+        #   |-------1
+        
         
         # Set result values based on conditions
         df.loc[(df['close'] > df['open']) & ((df['close'] - df['open']) >= (df['high'] - df['close'])), 'result'] = Result.TargetPositive.value
         df.loc[(df['close'] > df['open']) & ((df['close'] - df['open']) < (df['high'] - df['close'])), 'result'] = Result.Positive.value
         df.loc[df['close'] < df['open'], 'result'] = Result.Negative.value
         
-        # 4. Everything else remains Neutral (initialized earlier)
+        # df.drop(columns=BasicAlgorithm.all_fields(), inplace=True)
+        # df['open'] = df['close_1']
         
         df.dropna(inplace=True)
-
-        print("******")
-        print(df.head())
         
         # Print count of TargetPositive results
         target_positive_count = len(df[df['result'] == Result.TargetPositive.value])
+        print(f"TargetPositive count: {target_positive_count}")
+        print(f"Positive count: {len(df[df['result'] == Result.Positive.value])}")
+        print(f"Negative count: {len(df[df['result'] == Result.Negative.value])}")
         
-        # Create a new DataFrame with only needed columns
-        columns_to_keep = BasicAlgorithm.processed_data_schema()
-        df = df[columns_to_keep].copy()
-            
-        # Drop first N rows based on moving average window
-        ma_range = BasicAlgorithm.moving_average_points()
-        start_idx = ma_range[-1]
-        df = df.iloc[start_idx:]
+        print("All data:")
+        print(df.head())
         
-        # Drop any rows with NaN values
         df = df.dropna()
         
-        # Calculate split point at 80% of data
         split_idx = int(len(df) * 0.8)
         
         # Split data into training and test sets
-        training_df = df.iloc[:split_idx]
-        test_df = df.iloc[split_idx:]
+        training_df = df.iloc[:split_idx][BasicAlgorithm.training_data_fields()].copy()
+        test_df = df.iloc[split_idx:][BasicAlgorithm.testing_data_fields()].copy()
+        print("Training data columns:", ", ".join(training_df.columns))
+        print("Training data:")
+        print(training_df.head())
+        
+        print("Testing data columns:", ", ".join(test_df.columns))
+        print("Testing data:")
+        print(test_df.head())
         
         return training_df, test_df
+    
+    def model(self, model=None):
+        if model is None:
+            return self._model
+        else:
+            self._model = model
 
-    def train(self, training_df, model_path=None):
-        self._model.train(training_df, model_path or self._model_path)
+    def train(self, model, training_df, model_path=None):
+        model.train(training_df, model_path or self._model_path)
 
     def predict(self, test_sample):
         pred = self._model.predict(test_sample)
